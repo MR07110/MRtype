@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TypeRush — Typing Trainer</title>
+<title>MR TYPE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
@@ -1391,8 +1391,8 @@ body[data-theme="blood"] {
 <!-- ============================================================ -->
 <header class="header">
   <div class="logo">
-    <div class="logo-icon">T</div>
-    Type<span class="logo-accent">Rush</span>
+    <div class="logo-icon">mt</div>
+    MR<span class="logo-accent">TYPE</span>
   </div>
   <nav class="header-nav">
     <button class="header-btn" id="btnStats" data-tooltip="Statistika">
@@ -1723,7 +1723,7 @@ body[data-theme="blood"] {
 <div class="leaderboard-overlay" id="lbOverlay">
   <div class="leaderboard-panel">
     <div class="leaderboard-header">
-      <div class="leaderboard-title">🏆 Top Natijalar</div>
+      <div class="leaderboard-title">Top Natijalar</div>
       <button class="settings-close" id="lbClose">✕</button>
     </div>
     <div id="lbList"></div>
@@ -1736,8 +1736,8 @@ body[data-theme="blood"] {
 <div class="stats-page" id="statsPage">
   <div class="stats-page-inner">
     <div class="stats-pg-header">
-      <div class="stats-pg-title">📊 Statistika</div>
-      <button class="result-btn" id="statsPageClose" style="flex:none;min-width:100px">← Orqaga</button>
+      <div class="stats-pg-title">Statistika</div>
+      <button class="result-btn" id="statsPageClose" style="flex:none;min-width:100px">Orqaga</button>
     </div>
     <div class="stats-summary-row">
       <div class="stats-sum-card"><div class="stats-sum-val" id="sumTests">0</div><div class="stats-sum-lbl">Testlar</div></div>
@@ -2816,7 +2816,7 @@ document.querySelectorAll('.theme-swatch').forEach(sw => {
     sw.classList.add('active');
     Settings.theme = sw.dataset.theme;
     applySettings();
-    notify('Mavzu: ' + sw.dataset.theme, 'info', '🎨');
+    notify('Mavzu: ' + sw.dataset.theme, 'info', '');
   });
 });
 
@@ -2864,14 +2864,14 @@ function showResults({ net, raw, acc, cons, peak, elapsed }) {
 
   // Subtitle message
   const subtitles = {
-    0:  '💀 Boshlang\'ich darajasiz — mashq qiling!',
-    20: '🐢 Asta-sekin — lekin oldinga!',
-    40: '👆 Yaxshi boshlanish!',
-    60: '💪 O\'rtachadan yuqori!',
-    80: '⚡ Mohir yozuvchi!',
-    100:'🔥 Ekspert darajasi!',
-    120:'🚀 Fantastik tezlik!',
-    150:'👑 Legend darajasi!'
+    0:  ' Boshlang\'ich darajasiz — mashq qiling!',
+    20: ' Asta-sekin — lekin oldinga!',
+    40: ' Yaxshi boshlanish!',
+    60: ' O\'rtachadan yuqori!',
+    80: ' Mohir yozuvchi!',
+    100:' Ekspert darajasi!',
+    120:' Fantastik tezlik!',
+    150:' Legend darajasi!'
   };
   let msg = subtitles[0];
   for (const [k, v] of Object.entries(subtitles)) {
@@ -3051,7 +3051,7 @@ function drawResultChart() {
       tooltip.classList.add('visible');
       tooltip.style.left = Math.min(closest.x + 12, W - 140) + 'px';
       tooltip.style.top  = Math.max(closest.y - 70, 0) + 'px';
-      tooltip.innerHTML = `<strong>${closest.data.second}s</strong><br>⚡ Net: <strong>${closest.data.net}</strong><br>📊 Raw: ${closest.data.raw}<br>🎯 Acc: ${closest.data.acc}%`;
+      tooltip.innerHTML = `<strong>${closest.data.second}s</strong><br>⚡ Net: <strong>${closest.data.net}</strong><br> Raw: ${closest.data.raw}<br> Acc: ${closest.data.acc}%`;
     } else {
       tooltip.classList.remove('visible');
     }
@@ -3197,7 +3197,7 @@ function updateRank(wpm) {
     const prevBest = Math.max(...prevHistory.map(h => h.wpm));
     const prevRank = getRank(prevBest);
     if (rank.name !== prevRank.name) {
-      notify(`Yangi daraja: ${rank.name}! 🎉`, 'success', '🏆');
+      notify(`Yangi daraja: ${rank.name}! `, 'success', '');
     }
   }
 }
