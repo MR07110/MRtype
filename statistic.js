@@ -1,4 +1,4 @@
-// statistic.js - Professional Statistics Module with Charts
+// statistic.js - Full fixed version (panel never auto-opens)
 
 class Statistics {
   constructor() {
@@ -19,10 +19,16 @@ class Statistics {
     localStorage.setItem('mrtype_history', JSON.stringify(this.history.slice(0, 500)));
   }
 
+  // FIXED: Only adds to history, NEVER auto-opens panel
   addResult(result) {
     this.history.unshift(result);
     this.saveHistory();
-    this.updateStatsUI();
+    
+    // Only refresh if panel is already OPEN - never open it automatically
+    const overlay = document.getElementById('statsOverlay');
+    if (overlay && overlay.classList.contains('open')) {
+      this.renderStatsPage('statsContent');
+    }
   }
 
   getStats() {
@@ -37,8 +43,7 @@ class Statistics {
         bestRaw: 0,
         bestAcc: 0,
         consistency: 0,
-        peakWpm: 0,
-        rank: 'Boshlangich'
+        peakWpm: 0
       };
     }
 
@@ -51,13 +56,10 @@ class Statistics {
     const bestRaw = Math.max(...this.history.map(h => h.raw || h.wpm));
     const bestAcc = Math.max(...this.history.map(h => h.acc));
     
-    // Calculate consistency (standard deviation of WPM)
     const wpmValues = this.history.map(h => h.wpm);
     const mean = avgWpm;
     const variance = wpmValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / total;
     const consistency = Math.max(0, Math.min(100, Math.round(100 - (Math.sqrt(variance) / mean) * 100)));
-
-    // Get peak WPM (highest recorded)
     const peakWpm = bestWpm;
 
     return {
@@ -122,7 +124,6 @@ class Statistics {
   }
 
   getProgressionData() {
-    // Last 30 tests progression
     return this.history.slice(0, 30).reverse().map((h, i) => ({
       test: i + 1,
       wpm: h.wpm,
@@ -177,30 +178,43 @@ class Statistics {
     return heatmap;
   }
 
+  getRank(wpm) {
+    const ranks = [
+      { name: 'Boshlangich', min: 0, stars: 1, next: 20 },
+      { name: 'Organuvchi', min: 20, stars: 2, next: 40 },
+      { name: 'Ortacha', min: 40, stars: 2, next: 60 },
+      { name: 'Mohir', min: 60, stars: 3, next: 80 },
+      { name: 'Ustoz', min: 80, stars: 4, next: 100 },
+      { name: 'Ekspert', min: 100, stars: 4, next: 120 },
+      { name: 'Master', min: 120, stars: 5, next: 150 },
+      { name: 'Legend', min: 150, stars: 5, next: null }
+    ];
+    
+    for (let i = ranks.length - 1; i >= 0; i--) {
+      if (wpm >= ranks[i].min) return ranks[i];
+    }
+    return ranks[0];
+  }
+
   renderStatsPage(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
     const stats = this.getStats();
     const weeklyData = this.getWeeklyData();
-    const monthlyData = this.getMonthlyData();
     const progressionData = this.getProgressionData();
     const distributionData = this.getDistributionData();
-    
     const rank = this.getRank(stats.bestWpm);
     
     container.innerHTML = `
       <div class="stats-container">
-        <!-- Header -->
         <div class="stats-header">
           <div class="stats-title">Statistika</div>
           <div class="stats-subtitle">Sizning yozish natijalaringiz</div>
         </div>
         
-        <!-- Rank Card -->
         <div class="stats-rank-card">
           <div class="rank-badge-large">
-            <div class="rank-icon"></div>
             <div class="rank-name-large">${rank.name}</div>
             <div class="rank-stars-large">${'★'.repeat(rank.stars)}${'☆'.repeat(5 - rank.stars)}</div>
             <div class="rank-next-info">${rank.next ? `Keyingi daraja: ${rank.next} WPM` : 'Maksimal daraja!'}</div>
@@ -221,49 +235,40 @@ class Statistics {
           </div>
         </div>
         
-        <!-- Summary Grid -->
         <div class="stats-summary-grid">
           <div class="stats-summary-card">
-            <div class="summary-icon"></div>
             <div class="summary-value">${stats.bestWpm}</div>
             <div class="summary-label">Eng yuqori WPM</div>
-            <div class="summary-trend ${this.getTrend(stats.bestWpm, 'wpm')}"></div>
           </div>
           <div class="stats-summary-card">
-            <div class="summary-icon"></div>
             <div class="summary-value">${stats.avgAcc}%</div>
             <div class="summary-label">O'rtacha aniqlik</div>
           </div>
           <div class="stats-summary-card">
-            <div class="summary-icon"></div>
             <div class="summary-value">${stats.peakWpm}</div>
             <div class="summary-label">Eng yuqori tezlik</div>
           </div>
           <div class="stats-summary-card">
-            <div class="summary-icon"></div>
             <div class="summary-value">${stats.bestRaw}</div>
             <div class="summary-label">Raw WPM</div>
           </div>
           <div class="stats-summary-card">
-            <div class="summary-icon"></div>
             <div class="summary-value">${Math.floor(stats.totalTime / 60)}m ${stats.totalTime % 60}s</div>
             <div class="summary-label">Jami vaqt</div>
           </div>
           <div class="stats-summary-card">
-            <div class="summary-icon"></div>
             <div class="summary-value">${stats.totalWords}</div>
             <div class="summary-label">Yozilgan sozlar</div>
           </div>
         </div>
         
-        <!-- Charts Section -->
         <div class="stats-charts-section">
           <div class="chart-container">
             <div class="chart-header">
               <div class="chart-title">WPM Progression</div>
               <div class="chart-subtitle">So'nggi 30 test</div>
             </div>
-            <canvas id="progressionChart" class="stat-canvas"></canvas>
+            <canvas id="progressionChart" class="stat-canvas" width="400" height="200"></canvas>
           </div>
           
           <div class="chart-container">
@@ -271,7 +276,7 @@ class Statistics {
               <div class="chart-title">Weekly Average</div>
               <div class="chart-subtitle">Oxirgi 7 kun</div>
             </div>
-            <canvas id="weeklyChart" class="stat-canvas"></canvas>
+            <canvas id="weeklyChart" class="stat-canvas" width="400" height="200"></canvas>
           </div>
           
           <div class="chart-container">
@@ -279,7 +284,7 @@ class Statistics {
               <div class="chart-title">WPM Distribution</div>
               <div class="chart-subtitle">Natijalar taqsimoti</div>
             </div>
-            <canvas id="distributionChart" class="stat-canvas"></canvas>
+            <canvas id="distributionChart" class="stat-canvas" width="400" height="200"></canvas>
           </div>
           
           <div class="chart-container">
@@ -287,11 +292,10 @@ class Statistics {
               <div class="chart-title">Accuracy Trend</div>
               <div class="chart-subtitle">Aniqlik o'zgarishi</div>
             </div>
-            <canvas id="accuracyChart" class="stat-canvas"></canvas>
+            <canvas id="accuracyChart" class="stat-canvas" width="400" height="200"></canvas>
           </div>
         </div>
         
-        <!-- Recent Tests Table -->
         <div class="stats-table-container">
           <div class="table-header">
             <div class="table-title">So'nggi testlar</div>
@@ -308,22 +312,22 @@ class Statistics {
                   <th>Vaqt</th>
                   <th>Tur</th>
                   <th>Sana</th>
-                 </tr>
+                </tr>
               </thead>
               <tbody>
-                ${this.history.slice(0, 50).map((h, i) => `
+                ${this.history.slice(0, 30).map((h, i) => `
                   <tr>
-                    <td>${i + 1}</td>
-                    <td class="wpm-cell">${h.wpm}</td>
-                    <td class="raw-cell">${h.raw || h.wpm}</td>
-                    <td class="acc-cell">${h.acc}%</td>
-                    <td>${h.words}</td>
-                    <td>${h.time}s</td>
-                    <td class="mode-cell">${h.mode || 'time'}</td>
-                    <td class="date-cell">${new Date(h.date).toLocaleDateString('uz-UZ')}</td>
+                    <td style="padding:8px;font-size:0.7rem">${i + 1}</td>
+                    <td style="padding:8px;font-size:0.8rem;font-weight:800;color:var(--accent)">${h.wpm}</td>
+                    <td style="padding:8px;font-size:0.7rem;color:var(--info)">${h.raw || h.wpm}</td>
+                    <td style="padding:8px;font-size:0.7rem;color:var(--success)">${h.acc}%</td>
+                    <td style="padding:8px;font-size:0.7rem">${h.words}</td>
+                    <td style="padding:8px;font-size:0.7rem">${h.time}s</td>
+                    <td style="padding:8px;font-size:0.65rem;color:var(--text-muted)">${h.mode || 'time'}</td>
+                    <td style="padding:8px;font-size:0.6rem;color:var(--text-muted)">${new Date(h.date).toLocaleDateString('uz-UZ')}</td>
                   </tr>
                 `).join('')}
-                ${this.history.length === 0 ? '<tr><td colspan="8" class="empty-cell">Hali natijalar yoq</td></tr>' : ''}
+                ${this.history.length === 0 ? '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Hali natijalar yoq</td></tr>' : ''}
               </tbody>
             </table>
           </div>
@@ -335,10 +339,12 @@ class Statistics {
   }
 
   drawCharts(progressionData, weeklyData, distributionData, accuracyData) {
-    this.drawProgressionChart(progressionData);
-    this.drawWeeklyChart(weeklyData);
-    this.drawDistributionChart(distributionData);
-    this.drawAccuracyChart(accuracyData);
+    setTimeout(() => {
+      this.drawProgressionChart(progressionData);
+      this.drawWeeklyChart(weeklyData);
+      this.drawDistributionChart(distributionData);
+      this.drawAccuracyChart(accuracyData);
+    }, 100);
   }
 
   drawProgressionChart(data) {
@@ -346,11 +352,14 @@ class Statistics {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
-    const width = canvas.parentElement.clientWidth - 40;
-    const height = 280;
+    const container = canvas.parentElement;
+    const width = container.clientWidth - 40;
+    const height = 220;
     
     canvas.width = width;
     canvas.height = height;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
     
     ctx.clearRect(0, 0, width, height);
     
@@ -371,7 +380,6 @@ class Statistics {
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
     
-    // Draw grid lines
     ctx.beginPath();
     ctx.strokeStyle = '#20202a';
     ctx.lineWidth = 0.5;
@@ -389,7 +397,6 @@ class Statistics {
       ctx.fillText(wpmValue, padding.left - 5, y + 3);
     }
     
-    // Draw line
     ctx.beginPath();
     ctx.strokeStyle = '#e2b714';
     ctx.lineWidth = 2.5;
@@ -406,7 +413,6 @@ class Statistics {
     });
     ctx.stroke();
     
-    // Draw gradient under line
     const gradient = ctx.createLinearGradient(0, padding.top, 0, height - padding.bottom);
     gradient.addColorStop(0, 'rgba(226, 183, 20, 0.2)');
     gradient.addColorStop(1, 'rgba(226, 183, 20, 0)');
@@ -426,7 +432,6 @@ class Statistics {
     ctx.fillStyle = gradient;
     ctx.fill();
     
-    // Draw points
     data.forEach((point, i) => {
       const x = padding.left + (i / (data.length - 1)) * chartWidth;
       const y = padding.top + chartHeight - ((point.wpm - minWpm) / range) * chartHeight;
@@ -441,7 +446,6 @@ class Statistics {
       ctx.fill();
     });
     
-    // X-axis labels
     ctx.fillStyle = '#4a4a60';
     ctx.font = '10px "JetBrains Mono"';
     ctx.textAlign = 'center';
@@ -458,11 +462,14 @@ class Statistics {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
-    const width = canvas.parentElement.clientWidth - 40;
-    const height = 280;
+    const container = canvas.parentElement;
+    const width = container.clientWidth - 40;
+    const height = 220;
     
     canvas.width = width;
     canvas.height = height;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
     
     ctx.clearRect(0, 0, width, height);
     
@@ -475,7 +482,6 @@ class Statistics {
     }
     
     const maxWpm = Math.max(...data.map(d => d.wpm), 50);
-    
     const barWidth = (width - 60) / data.length - 8;
     const startX = 40;
     
@@ -484,11 +490,9 @@ class Statistics {
       const x = startX + i * (barWidth + 8);
       const y = height - 30 - barHeight;
       
-      // Draw bar
       ctx.fillStyle = item.wpm > 0 ? '#e2b714' : '#20202a';
       ctx.fillRect(x, y, barWidth, barHeight);
       
-      // Draw value on top
       if (item.wpm > 0) {
         ctx.fillStyle = '#d0d0ea';
         ctx.font = '10px "JetBrains Mono"';
@@ -496,7 +500,6 @@ class Statistics {
         ctx.fillText(item.wpm, x + barWidth / 2, y - 5);
       }
       
-      // Draw day label
       ctx.fillStyle = '#4a4a60';
       ctx.font = '9px "JetBrains Mono"';
       ctx.fillText(item.day, x + barWidth / 2, height - 10);
@@ -508,11 +511,14 @@ class Statistics {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
-    const width = canvas.parentElement.clientWidth - 40;
-    const height = 280;
+    const container = canvas.parentElement;
+    const width = container.clientWidth - 40;
+    const height = 220;
     
     canvas.width = width;
     canvas.height = height;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
     
     ctx.clearRect(0, 0, width, height);
     
@@ -539,13 +545,11 @@ class Statistics {
       ctx.fillStyle = colors[i % colors.length];
       ctx.fillRect(x, y, barWidth, barHeight);
       
-      // Draw label
       ctx.fillStyle = '#4a4a60';
       ctx.font = '8px "JetBrains Mono"';
       ctx.textAlign = 'center';
       ctx.fillText(item.label, x + barWidth / 2, height - 10);
       
-      // Draw count
       if (item.count > 0) {
         ctx.fillStyle = '#d0d0ea';
         ctx.font = '9px "JetBrains Mono"';
@@ -559,11 +563,14 @@ class Statistics {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
-    const width = canvas.parentElement.clientWidth - 40;
-    const height = 280;
+    const container = canvas.parentElement;
+    const width = container.clientWidth - 40;
+    const height = 220;
     
     canvas.width = width;
     canvas.height = height;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
     
     ctx.clearRect(0, 0, width, height);
     
@@ -578,12 +585,12 @@ class Statistics {
     const values = data.map(d => d.acc);
     const maxAcc = 100;
     const minAcc = Math.min(...values, 80);
+    const range = maxAcc - minAcc;
     
     const padding = { left: 40, right: 20, top: 20, bottom: 30 };
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
     
-    // Draw grid lines
     ctx.beginPath();
     ctx.strokeStyle = '#20202a';
     ctx.lineWidth = 0.5;
@@ -594,18 +601,17 @@ class Statistics {
       ctx.lineTo(width - padding.right, y);
       ctx.stroke();
       
-      const accValue = Math.round(maxAcc - (20 * i));
+      const accValue = Math.round(maxAcc - (range * i / 4));
       ctx.fillStyle = '#4a4a60';
       ctx.font = '10px "JetBrains Mono"';
       ctx.textAlign = 'right';
       ctx.fillText(accValue + '%', padding.left - 5, y + 3);
     }
     
-    // Draw area
     ctx.beginPath();
     data.forEach((point, i) => {
       const x = padding.left + (i / (data.length - 1)) * chartWidth;
-      const y = padding.top + chartHeight - ((point.acc - minAcc) / (maxAcc - minAcc)) * chartHeight;
+      const y = padding.top + chartHeight - ((point.acc - minAcc) / range) * chartHeight;
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -617,11 +623,10 @@ class Statistics {
     ctx.fillStyle = 'rgba(78, 201, 160, 0.15)';
     ctx.fill();
     
-    // Draw line
     ctx.beginPath();
     data.forEach((point, i) => {
       const x = padding.left + (i / (data.length - 1)) * chartWidth;
-      const y = padding.top + chartHeight - ((point.acc - minAcc) / (maxAcc - minAcc)) * chartHeight;
+      const y = padding.top + chartHeight - ((point.acc - minAcc) / range) * chartHeight;
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -632,7 +637,6 @@ class Statistics {
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    // X-axis labels
     ctx.fillStyle = '#4a4a60';
     ctx.font = '10px "JetBrains Mono"';
     ctx.textAlign = 'center';
@@ -642,32 +646,6 @@ class Statistics {
       const x = padding.left + (i / (data.length - 1)) * chartWidth;
       ctx.fillText(data[i].test, x, height - padding.bottom + 15);
     }
-  }
-
-  getRank(wpm) {
-    const ranks = [
-      { name: 'Boshlangich', min: 0, stars: 1, next: 20 },
-      { name: 'Organuvchi', min: 20, stars: 2, next: 40 },
-      { name: 'Ortacha', min: 40, stars: 2, next: 60 },
-      { name: 'Mohir', min: 60, stars: 3, next: 80 },
-      { name: 'Ustoz', min: 80, stars: 4, next: 100 },
-      { name: 'Ekspert', min: 100, stars: 4, next: 120 },
-      { name: 'Master', min: 120, stars: 5, next: 150 },
-      { name: 'Legend', min: 150, stars: 5, next: null }
-    ];
-    
-    for (let i = ranks.length - 1; i >= 0; i--) {
-      if (wpm >= ranks[i].min) return ranks[i];
-    }
-    return ranks[0];
-  }
-
-  getTrend(value, type) {
-    if (this.history.length < 2) return '';
-    const prevBest = Math.max(...this.history.slice(1).map(h => h[type === 'wpm' ? 'wpm' : 'acc']));
-    if (value > prevBest) return 'trend-up';
-    if (value < prevBest) return 'trend-down';
-    return 'trend-steady';
   }
 
   exportData() {
@@ -683,6 +661,18 @@ class Statistics {
     a.download = `mrtype_stats_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    this.showToast('Statistika eksport qilindi', 'success');
+  }
+
+  showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    const container = document.getElementById('toastContainer');
+    if (container) {
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
   }
 }
 
