@@ -63,14 +63,6 @@ let wordSpans = [];
 let currentWordSpan = null;
 
 // ============ UTILITIES ============
-function showToast(msg) {
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = msg;
-  dom.toastContainer.appendChild(t);
-  setTimeout(() => t.remove(), 2000);
-}
-
 function playSound(type) {
   if (!settings.soundEnabled) return;
   if (!audioCtx) {
@@ -213,7 +205,7 @@ function updateCurrentWordDisplayFast() {
   if (currentWordSpan.innerHTML !== html) currentWordSpan.innerHTML = html;
 }
 
-// ============ FIXED CARET - Always at center, caret BETWEEN characters ============
+// ============ CARET ============
 function updateCaret() {
   if (!currentWordSpan) {
     dom.caret.style.opacity = '0';
@@ -262,7 +254,7 @@ function updateCaret() {
   
   const translateX = caretTargetLeft - charOffsetInContainer;
   
-  dom.wordsContainer.style.transition = 'transform 0.05s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+  dom.wordsContainer.style.transition = 'transform 0.12s cubic-bezier(0.25, 0.8, 0.25, 1.2)';
   dom.wordsContainer.style.transform = `translateX(${translateX}px)`;
   
   dom.caret.style.left = caretTargetLeft + 'px';
@@ -530,24 +522,7 @@ function handleSpace() {
   if (settings.mode === 'quote' && gameState.curWord >= gameState.words.length) finishGame();
 }
 
-function initGame() {
-  gameState.words = settings.mode === 'quote' ? generateQuote() : generateWords();
-  gameState.curWord = 0;
-  gameState.typedBuf = '';
-  gameState.extraChars = '';
-  gameState.isRunning = false;
-  gameState.isFinished = false;
-  gameState.totalKeys = 0;
-  gameState.correctKeys = 0;
-  gameState.wrongKeys = 0;
-  gameState.wordsCompleted = 0;
-  gameState.wordTyped = [];
-  wordSpans = [];
-  renderWords();
-  updateStatsDisplay();
-}
-
-// ============ STATISTICS FUNCTIONS ============
+// ============ STATISTICS ============
 function getStatsData() {
   if (!userHistory.length) return null;
   const total = userHistory.length;
@@ -649,19 +624,11 @@ function drawProgressionChart(canvasId, data) {
   data.forEach((p, i) => {
     const x = padL + (i / (data.length - 1)) * chartW;
     const y = padT + chartH - ((p.wpm - minWpm) / range) * chartH;
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#e2b714';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#0a0a0c';
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fillStyle = '#e2b714'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fillStyle = '#0a0a0c'; ctx.fill();
   });
   
-  ctx.fillStyle = '#6a6a8a';
-  ctx.font = '8px monospace';
-  ctx.textAlign = 'center';
+  ctx.fillStyle = '#6a6a8a'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
   const step = Math.ceil(data.length / 6);
   for (let i = 0; i < data.length; i += step) {
     const x = padL + (i / (data.length - 1)) * chartW;
@@ -676,10 +643,8 @@ function drawWeeklyChart(canvasId, data) {
   const container = canvas.parentElement;
   const width = container.clientWidth - 40;
   const height = 200;
-  canvas.width = width;
-  canvas.height = height;
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
+  canvas.width = width; canvas.height = height;
+  canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
   
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, width, height);
@@ -695,13 +660,10 @@ function drawWeeklyChart(canvasId, data) {
     ctx.fillStyle = item.wpm > 0 ? colors[i % colors.length] : '#2a2a3a';
     ctx.fillRect(x, y, barWidth, barH);
     if (item.wpm > 0) {
-      ctx.fillStyle = '#d0d0ea';
-      ctx.font = '8px monospace';
-      ctx.textAlign = 'center';
+      ctx.fillStyle = '#d0d0ea'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
       ctx.fillText(item.wpm, x + barWidth/2, y - 4);
     }
-    ctx.fillStyle = '#6a6a8a';
-    ctx.font = '8px monospace';
+    ctx.fillStyle = '#6a6a8a'; ctx.font = '8px monospace';
     ctx.fillText(item.day, x + barWidth/2, height - 10);
   });
 }
@@ -713,10 +675,8 @@ function drawDistributionChart(canvasId, data) {
   const container = canvas.parentElement;
   const width = container.clientWidth - 40;
   const height = 200;
-  canvas.width = width;
-  canvas.height = height;
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
+  canvas.width = width; canvas.height = height;
+  canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
   
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, width, height);
@@ -735,13 +695,10 @@ function drawDistributionChart(canvasId, data) {
     ctx.fillStyle = colors[i % colors.length];
     ctx.fillRect(x, y, barWidth, barH);
     if (item.count > 0) {
-      ctx.fillStyle = '#d0d0ea';
-      ctx.font = '7px monospace';
-      ctx.textAlign = 'center';
+      ctx.fillStyle = '#d0d0ea'; ctx.font = '7px monospace'; ctx.textAlign = 'center';
       ctx.fillText(item.count, x + barWidth/2, y - 3);
     }
-    ctx.fillStyle = '#6a6a8a';
-    ctx.font = '7px monospace';
+    ctx.fillStyle = '#6a6a8a'; ctx.font = '7px monospace';
     ctx.fillText(item.label, x + barWidth/2, height - 8);
   });
 }
@@ -753,10 +710,8 @@ function drawAccuracyChart(canvasId, data) {
   const container = canvas.parentElement;
   const width = container.clientWidth - 40;
   const height = 200;
-  canvas.width = width;
-  canvas.height = height;
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
+  canvas.width = width; canvas.height = height;
+  canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
   
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, width, height);
@@ -773,24 +728,18 @@ function drawAccuracyChart(canvasId, data) {
   ctx.strokeStyle = '#2a2a3a';
   for (let i = 0; i <= 4; i++) {
     const y = padT + (chartH * i / 4);
-    ctx.moveTo(padL, y);
-    ctx.lineTo(width - padR, y);
-    ctx.stroke();
-    ctx.fillStyle = '#6a6a8a';
-    ctx.font = '8px monospace';
-    ctx.textAlign = 'right';
+    ctx.moveTo(padL, y); ctx.lineTo(width - padR, y); ctx.stroke();
+    ctx.fillStyle = '#6a6a8a'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
     ctx.fillText(Math.round(maxAcc - (range * i / 4)) + '%', padL - 5, y + 3);
   }
   
   if (data.length > 1) {
     ctx.beginPath();
-    ctx.strokeStyle = '#4ec9a0';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#4ec9a0'; ctx.lineWidth = 2;
     data.forEach((p, i) => {
       const x = padL + (i / (data.length - 1)) * chartW;
       const y = padT + chartH - ((p.acc - minAcc) / range) * chartH;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
   }
@@ -799,17 +748,12 @@ function drawAccuracyChart(canvasId, data) {
   data.forEach((p, i) => {
     const x = padL + (i / (data.length - 1)) * chartW;
     const y = padT + chartH - ((p.acc - minAcc) / range) * chartH;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   });
-  ctx.lineTo(padL + chartW, height - padB);
-  ctx.lineTo(padL, height - padB);
-  ctx.fillStyle = 'rgba(78, 201, 160, 0.1)';
-  ctx.fill();
+  ctx.lineTo(padL + chartW, height - padB); ctx.lineTo(padL, height - padB);
+  ctx.fillStyle = 'rgba(78, 201, 160, 0.1)'; ctx.fill();
   
-  ctx.fillStyle = '#6a6a8a';
-  ctx.font = '8px monospace';
-  ctx.textAlign = 'center';
+  ctx.fillStyle = '#6a6a8a'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
   const step = Math.ceil(data.length / 6);
   for (let i = 0; i < data.length; i += step) {
     const x = padL + (i / (data.length - 1)) * chartW;
@@ -847,21 +791,18 @@ function loadStats() {
           <div><div style="font-size:2rem;font-weight:800;color:var(--success)">${stats.avgAcc}%</div><div style="font-size:0.6rem">Aniqlik</div></div>
         </div>
       </div>
-      
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
         <div style="background:var(--bg3);padding:16px;border-radius:12px;text-align:center"><div style="font-size:1.5rem;font-weight:800;color:var(--info)">${stats.total}</div><div style="font-size:0.55rem">Testlar</div></div>
         <div style="background:var(--bg3);padding:16px;border-radius:12px;text-align:center"><div style="font-size:1.5rem;font-weight:800;color:var(--info)">${Math.floor(stats.totalTime/60)}m ${stats.totalTime%60}s</div><div style="font-size:0.55rem">Jami vaqt</div></div>
         <div style="background:var(--bg3);padding:16px;border-radius:12px;text-align:center"><div style="font-size:1.5rem;font-weight:800;color:var(--info)">${stats.totalWords}</div><div style="font-size:0.55rem">Sozlar</div></div>
         <div style="background:var(--bg3);padding:16px;border-radius:12px;text-align:center"><div style="font-size:1.5rem;font-weight:800;color:var(--accent)">${stats.bestWpm}</div><div style="font-size:0.55rem">Peak</div></div>
       </div>
-      
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:24px">
-        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">WPM Progression</div><div style="font-size:0.6rem;color:var(--text-dim)">Songi 30 test</div></div><canvas id="progCanvas" style="width:100%;height:200px"></canvas></div>
-        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">Weekly Average</div><div style="font-size:0.6rem;color:var(--text-dim)">Oxirgi 7 kun</div></div><canvas id="weekCanvas" style="width:100%;height:200px"></canvas></div>
-        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">WPM Distribution</div><div style="font-size:0.6rem;color:var(--text-dim)">Natijalar taqsimoti</div></div><canvas id="distCanvas" style="width:100%;height:200px"></canvas></div>
-        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">Accuracy Trend</div><div style="font-size:0.6rem;color:var(--text-dim)">Aniqlik ozgarishi</div></div><canvas id="accCanvas" style="width:100%;height:200px"></canvas></div>
+        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">WPM Progression</div></div><canvas id="progCanvas" style="width:100%;height:200px"></canvas></div>
+        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">Weekly Average</div></div><canvas id="weekCanvas" style="width:100%;height:200px"></canvas></div>
+        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">WPM Distribution</div></div><canvas id="distCanvas" style="width:100%;height:200px"></canvas></div>
+        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">Accuracy Trend</div></div><canvas id="accCanvas" style="width:100%;height:200px"></canvas></div>
       </div>
-      
       <div style="background:var(--bg3);border-radius:12px;overflow:hidden">
         <div style="padding:16px;border-bottom:1px solid var(--border);font-weight:700">Songi testlar</div>
         <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
@@ -902,7 +843,7 @@ function loadLeaderboard() {
   document.getElementById('leaderboardOverlay').classList.add('open');
 }
 
-// ============ SHARE FUNCTIONS ============
+// ============ SHARE ============
 function showSharePreview(entry) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -911,8 +852,7 @@ function showSharePreview(entry) {
   const rank = getRank(best);
   const avgWpm = userHistory.length > 1 ? Math.round(userHistory.reduce((a,b) => a + b.wpm, 0) / userHistory.length) : entry.wpm;
   
-  const previewInner = document.getElementById('sharePreviewInner');
-  previewInner.innerHTML = `
+  document.getElementById('sharePreviewInner').innerHTML = `
     <div class="share-card-header">
       <div class="share-card-logo">mt</div>
       <div class="share-card-brand">mr<span style="color:var(--accent)">type</span></div>
@@ -924,33 +864,15 @@ function showSharePreview(entry) {
       <span class="share-card-rank-stars">${'★'.repeat(rank.stars)}${'☆'.repeat(5 - rank.stars)}</span>
     </div>
     <div class="share-card-stats">
-      <div class="share-card-stat">
-        <div class="share-card-stat-value success">${entry.acc}%</div>
-        <div class="share-card-stat-label">Aniqlik</div>
-      </div>
-      <div class="share-card-stat">
-        <div class="share-card-stat-value info">${entry.raw}</div>
-        <div class="share-card-stat-label">Raw WPM</div>
-      </div>
-      <div class="share-card-stat">
-        <div class="share-card-stat-value">${entry.words}</div>
-        <div class="share-card-stat-label">So'zlar</div>
-      </div>
-      <div class="share-card-stat">
-        <div class="share-card-stat-value accent">${avgWpm}</div>
-        <div class="share-card-stat-label">O'rtacha WPM</div>
-      </div>
+      <div class="share-card-stat"><div class="share-card-stat-value success">${entry.acc}%</div><div class="share-card-stat-label">Aniqlik</div></div>
+      <div class="share-card-stat"><div class="share-card-stat-value info">${entry.raw}</div><div class="share-card-stat-label">Raw WPM</div></div>
+      <div class="share-card-stat"><div class="share-card-stat-value">${entry.words}</div><div class="share-card-stat-label">So'zlar</div></div>
+      <div class="share-card-stat"><div class="share-card-stat-value accent">${avgWpm}</div><div class="share-card-stat-label">O'rtacha WPM</div></div>
     </div>
     <div class="share-card-divider"></div>
     <div class="share-card-meta">
-      <div class="share-card-meta-item">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span class="share-card-user">${userName}</span>
-      </div>
-      <div class="share-card-meta-item">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span class="share-card-date">${dateStr} · ${timeStr}</span>
-      </div>
+      <div class="share-card-meta-item"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="share-card-user">${userName}</span></div>
+      <div class="share-card-meta-item"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="share-card-date">${dateStr} · ${timeStr}</span></div>
     </div>
     <div class="share-card-footer">
       <div class="share-card-footer-logo">mt</div>
@@ -963,32 +885,22 @@ function showSharePreview(entry) {
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
   ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
 }
 
 function saveShareAsImage() {
   const entryData = window._lastEntry;
-  if (!entryData) {
-    showToast('Xatolik: ma\'lumot topilmadi');
-    return;
-  }
+  if (!entryData) return;
   
   const canvas = document.getElementById('shareCanvas');
   const ctx = canvas.getContext('2d');
-  
-  const w = 800;
-  const h = 600;
-  canvas.width = w;
-  canvas.height = h;
+  const w = 800, h = 600;
+  canvas.width = w; canvas.height = h;
   
   const styles = getComputedStyle(document.body);
   const bgColor = styles.getPropertyValue('--bg').trim() || '#323437';
@@ -1000,60 +912,22 @@ function saveShareAsImage() {
   const successColor = styles.getPropertyValue('--success').trim() || '#6ddf6d';
   const infoColor = styles.getPropertyValue('--info').trim() || '#7eb8f7';
   
-  // Fon
-  ctx.fillStyle = bgColor;
-  roundRect(ctx, 20, 20, w - 40, h - 40, 20);
-  ctx.fill();
+  ctx.fillStyle = bgColor; roundRect(ctx, 20, 20, w - 40, h - 40, 20); ctx.fill();
+  ctx.strokeStyle = borderColor; ctx.lineWidth = 2; roundRect(ctx, 20, 20, w - 40, h - 40, 20); ctx.stroke();
   
-  // Border
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 2;
-  roundRect(ctx, 20, 20, w - 40, h - 40, 20);
-  ctx.stroke();
+  ctx.fillStyle = accentColor; roundRect(ctx, 50, 50, 40, 40, 8); ctx.fill();
+  ctx.fillStyle = bgColor; ctx.font = 'bold 18px "JetBrains Mono"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('mt', 70, 70);
+  ctx.fillStyle = textDimColor; ctx.font = 'bold 20px "JetBrains Mono"'; ctx.textAlign = 'left'; ctx.fillText('mr', 100, 70);
+  ctx.fillStyle = accentColor; ctx.fillText('type', 130, 70);
   
-  // Logo
-  ctx.fillStyle = accentColor;
-  roundRect(ctx, 50, 50, 40, 40, 8);
-  ctx.fill();
-  ctx.fillStyle = bgColor;
-  ctx.font = 'bold 18px "JetBrains Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('mt', 70, 70);
-  
-  // Brand
-  ctx.fillStyle = textDimColor;
-  ctx.font = 'bold 20px "JetBrains Mono", monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('mr', 100, 70);
-  ctx.fillStyle = accentColor;
-  ctx.fillText('type', 130, 70);
-  
-  // WPM
   const wpm = entryData.wpm;
-  ctx.fillStyle = accentColor;
-  ctx.font = 'bold 120px "JetBrains Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(wpm, w / 2, 200);
+  ctx.fillStyle = accentColor; ctx.font = 'bold 120px "JetBrains Mono"'; ctx.textAlign = 'center'; ctx.fillText(wpm, w / 2, 200);
+  ctx.fillStyle = textDimColor; ctx.font = '14px "JetBrains Mono"'; ctx.fillText('WORDS PER MINUTE', w / 2, 250);
   
-  // WPM label
-  ctx.fillStyle = textDimColor;
-  ctx.font = '14px "JetBrains Mono", monospace';
-  ctx.fillText('WORDS PER MINUTE', w / 2, 250);
-  
-  // Rank
   const rank = getRank(wpm);
-  ctx.fillStyle = accentColor;
-  ctx.font = 'bold 18px monospace';
-  ctx.fillText(rank.name + '  ' + '★'.repeat(rank.stars) + '☆'.repeat(5 - rank.stars), w / 2, 285);
+  ctx.fillStyle = accentColor; ctx.font = 'bold 18px monospace'; ctx.fillText(rank.name + '  ' + '★'.repeat(rank.stars) + '☆'.repeat(5 - rank.stars), w / 2, 285);
   
-  // Stats
-  const statY = 320;
-  const statW = (w - 140) / 2;
-  const statH = 70;
-  const gap = 20;
+  const statY = 320, statW = (w - 140) / 2, statH = 70, gap = 20;
   const statsList = [
     { value: entryData.acc + '%', label: 'Aniqlik', color: successColor },
     { value: entryData.raw, label: 'Raw WPM', color: infoColor },
@@ -1062,85 +936,36 @@ function saveShareAsImage() {
   ];
   
   statsList.forEach((stat, i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const x = 60 + col * (statW + gap);
-    const y = statY + row * (statH + gap);
-    
-    ctx.fillStyle = bg2Color;
-    roundRect(ctx, x, y, statW, statH, 12);
-    ctx.fill();
-    
-    ctx.fillStyle = stat.color;
-    ctx.font = 'bold 26px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(stat.value, x + statW / 2, y + statH / 2 - 8);
-    
-    ctx.fillStyle = textDimColor;
-    ctx.font = '11px monospace';
-    ctx.fillText(stat.label, x + statW / 2, y + statH / 2 + 18);
+    const col = i % 2, row = Math.floor(i / 2);
+    const x = 60 + col * (statW + gap), y = statY + row * (statH + gap);
+    ctx.fillStyle = bg2Color; roundRect(ctx, x, y, statW, statH, 12); ctx.fill();
+    ctx.fillStyle = stat.color; ctx.font = 'bold 26px "JetBrains Mono"'; ctx.textAlign = 'center'; ctx.fillText(stat.value, x + statW / 2, y + statH / 2 - 8);
+    ctx.fillStyle = textDimColor; ctx.font = '11px monospace'; ctx.fillText(stat.label, x + statW / 2, y + statH / 2 + 18);
   });
   
-  // Divider
   const dividerY = statY + 2 * (statH + gap) + 20;
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(60, dividerY);
-  ctx.lineTo(w - 60, dividerY);
-  ctx.stroke();
+  ctx.strokeStyle = borderColor; ctx.beginPath(); ctx.moveTo(60, dividerY); ctx.lineTo(w - 60, dividerY); ctx.stroke();
   
-  // Meta
   const metaY = dividerY + 30;
   const now = new Date();
   const dateStr = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
   const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
   
-  ctx.fillStyle = accentColor;
-  ctx.font = 'bold 13px monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('👤 ' + userName, 65, metaY);
+  ctx.fillStyle = accentColor; ctx.font = 'bold 13px monospace'; ctx.textAlign = 'left'; ctx.fillText('Qosimov Muhammadrasul', 65, metaY);
+  ctx.fillStyle = textDimColor; ctx.font = '12px monospace'; ctx.textAlign = 'right'; ctx.fillText(dateStr + ' · ' + timeStr, w - 65, metaY);
   
-  ctx.fillStyle = textDimColor;
-  ctx.font = '12px monospace';
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('📅 ' + dateStr + ' · ' + timeStr, w - 65, metaY);
+  ctx.fillStyle = accentColor; roundRect(ctx, 60, h - 80, 22, 22, 5); ctx.fill();
+  ctx.fillStyle = bgColor; ctx.font = 'bold 10px "JetBrains Mono"'; ctx.textAlign = 'center'; ctx.fillText('mt', 71, h - 69);
+  ctx.fillStyle = textDimColor; ctx.font = '11px monospace'; ctx.textAlign = 'left'; ctx.fillText('© mrtype.uz', 90, h - 69);
   
-  // Footer
-  ctx.fillStyle = accentColor;
-  roundRect(ctx, 60, h - 80, 22, 22, 5);
-  ctx.fill();
-  ctx.fillStyle = bgColor;
-  ctx.font = 'bold 10px "JetBrains Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('mt', 71, h - 69);
-  
-  ctx.fillStyle = textDimColor;
-  ctx.font = '11px monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('© mrtype.uz · Barcha huquqlar himoyalangan', 90, h - 69);
-  
-  // Yuklash
   const a = document.createElement('a');
-  a.download = `mrtype_${wpm}wpm.png`;
-  a.href = canvas.toDataURL('image/png');
-  a.click();
-  
+  a.download = `mrtype_${wpm}wpm.png`; a.href = canvas.toDataURL('image/png'); a.click();
   document.getElementById('shareOverlay').classList.remove('open');
-  showToast('✅ Rasm saqlandi!');
 }
 
 function shareResult() {
   const entry = window._lastEntry;
-  if (!entry) {
-    showToast('Avval test yakunlang!');
-    return;
-  }
+  if (!entry) return;
   document.getElementById('resultOverlay').classList.remove('open');
   showSharePreview(entry);
 }
@@ -1151,7 +976,6 @@ function changeSound() {
   currentSound = sounds[idx];
   const names = {blue:'Blue Switch',brown:'Brown Switch',red:'Red Switch',creamy:'Creamy',thock:'Thock'};
   dom.soundName.textContent = names[currentSound];
-  showToast(`Ovoz: ${names[currentSound]}`);
 }
 
 function focusInput() { 
@@ -1178,32 +1002,16 @@ function renderSubOptions() {
       dom.subOptions.appendChild(b);
     });
   } else if (settings.mode === 'quote') {
-    const b = document.createElement('button');
-    b.className = 'sub-opt active';
-    b.textContent = 'Yangi iqtibos';
-    b.onclick = () => fullResetWithNewWords();
-    dom.subOptions.appendChild(b);
+    const b = document.createElement('button'); b.className = 'sub-opt active'; b.textContent = 'Yangi iqtibos';
+    b.onclick = () => fullResetWithNewWords(); dom.subOptions.appendChild(b);
   } else if (settings.mode === 'dev') {
-    const b = document.createElement('button');
-    b.className = 'sub-opt active';
-    b.textContent = 'Dasturlash';
+    const b = document.createElement('button'); b.className = 'sub-opt active'; b.textContent = 'Dasturlash';
     dom.subOptions.appendChild(b);
   } else if (settings.mode === 'custom') {
-    const b = document.createElement('button');
-    b.className = 'sub-opt active';
-    b.textContent = 'Oz matn';
+    const b = document.createElement('button'); b.className = 'sub-opt active'; b.textContent = 'Oz matn';
     b.onclick = () => {
       const text = prompt('Matnni kiriting:');
-      if (text) {
-        gameState.words = text.split(' ');
-        gameState.curWord = 0;
-        gameState.typedBuf = '';
-        gameState.extraChars = '';
-        gameState.wordTyped = [];
-        wordSpans = [];
-        renderWords();
-        dom.hiddenInput.focus();
-      }
+      if (text) { gameState.words = text.split(' '); gameState.curWord = 0; gameState.typedBuf = ''; gameState.extraChars = ''; gameState.wordTyped = []; wordSpans = []; renderWords(); dom.hiddenInput.focus(); }
     };
     dom.subOptions.appendChild(b);
   }
@@ -1214,14 +1022,10 @@ function toggleZenMode() {
   document.body.classList.toggle('zen-mode', settings.zenMode);
 }
 
-// ============ INITIALIZATION ============
-try {
-  const saved = localStorage.getItem('mrtype_history');
-  if (saved) userHistory = JSON.parse(saved);
-} catch(e) { userHistory = []; }
+// ============ INIT ============
+try { const saved = localStorage.getItem('mrtype_history'); if (saved) userHistory = JSON.parse(saved); } catch(e) { userHistory = []; }
 updateRankBadge();
 
-// Event Listeners
 document.querySelectorAll('.mode-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
@@ -1235,33 +1039,15 @@ document.querySelectorAll('.mode-tab').forEach(tab => {
 document.addEventListener('keydown', (e) => {
   const overlays = ['resultOverlay', 'settingsOverlay', 'leaderboardOverlay', 'statsOverlay', 'duelOverlay', 'shareOverlay'];
   if (overlays.some(id => document.getElementById(id)?.classList.contains('open'))) {
-    if (e.key === 'Escape') {
-      overlays.forEach(id => document.getElementById(id)?.classList.remove('open'));
-      focusInput();
-    }
+    if (e.key === 'Escape') { overlays.forEach(id => document.getElementById(id)?.classList.remove('open')); focusInput(); }
     return;
   }
-  
-  if (e.key === 'Tab') { 
-    e.preventDefault(); 
-    sameWordsRestart();
-    showToast('🔁 Qayta boshlandi');
-    return; 
-  }
-  
-  if ((e.ctrlKey || e.metaKey) && e.key === 'r') { 
-    e.preventDefault(); 
-    fullResetWithNewWords();
-    showToast('🔄 Yangi so\'zlar yuklandi');
-    return; 
-  }
-  
+  if (e.key === 'Tab') { e.preventDefault(); sameWordsRestart(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); fullResetWithNewWords(); return; }
   const ignore = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
   if (ignore.includes(e.key) || e.ctrlKey || e.altKey) return;
-  
   e.preventDefault();
   highlightKey(e.key.toLowerCase(), 'press');
-  
   if (e.key === 'Backspace') handleBackspace();
   else if (e.key === ' ') handleSpace();
   else if (e.key.length === 1) handleChar(e.key);
@@ -1272,7 +1058,7 @@ dom.typingArea.addEventListener('click', focusInput);
 dom.hiddenInput.addEventListener('blur', () => dom.typingArea.classList.add('blurred'));
 dom.hiddenInput.addEventListener('focus', () => dom.typingArea.classList.remove('blurred'));
 
-// ============ BUTTON HANDLERS ============
+// Buttons
 document.getElementById('settingsBtn').onclick = () => document.getElementById('settingsOverlay').classList.add('open');
 document.getElementById('settingsClose').onclick = () => { document.getElementById('settingsOverlay').classList.remove('open'); focusInput(); };
 document.getElementById('leaderboardBtn').onclick = () => loadLeaderboard();
@@ -1285,28 +1071,18 @@ document.getElementById('shareResultBtn').onclick = () => shareResult();
 document.getElementById('sharePreviewClose').onclick = () => { document.getElementById('shareOverlay').classList.remove('open'); focusInput(); };
 document.getElementById('shareCancelBtn').onclick = () => { document.getElementById('shareOverlay').classList.remove('open'); focusInput(); };
 document.getElementById('shareSaveBtn').onclick = () => saveShareAsImage();
-document.getElementById('newWordsBtn').onclick = () => { document.getElementById('resultOverlay').classList.remove('open'); fullResetWithNewWords(); showToast('🔄 Yangi so\'zlar yuklandi'); };
-document.getElementById('restartResultBtn').onclick = () => { document.getElementById('resultOverlay').classList.remove('open'); sameWordsRestart(); showToast('🔁 Qayta boshlandi'); };
+document.getElementById('newWordsBtn').onclick = () => { document.getElementById('resultOverlay').classList.remove('open'); fullResetWithNewWords(); };
+document.getElementById('restartResultBtn').onclick = () => { document.getElementById('resultOverlay').classList.remove('open'); sameWordsRestart(); };
 document.getElementById('soundBtn').onclick = () => changeSound();
 
-// Overlay outside click
 ['settingsOverlay', 'leaderboardOverlay', 'statsOverlay', 'resultOverlay', 'duelOverlay', 'shareOverlay'].forEach(id => {
-  document.getElementById(id).addEventListener('click', function(e) {
-    if (e.target === this) {
-      this.classList.remove('open');
-      focusInput();
-    }
-  });
+  document.getElementById(id).addEventListener('click', function(e) { if (e.target === this) { this.classList.remove('open'); focusInput(); } });
 });
 
-// Settings panel
 document.querySelectorAll('#langOptions .settings-btn').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('#langOptions .settings-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    settings.lang = btn.dataset.lang;
-    fullResetWithNewWords();
-    showToast(`🌐 Til: ${btn.textContent}`);
+    btn.classList.add('active'); settings.lang = btn.dataset.lang; fullResetWithNewWords();
   };
 });
 
@@ -1314,31 +1090,115 @@ document.querySelectorAll('#fontSizeOptions .settings-btn').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('#fontSizeOptions .settings-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    settings.fontSize = btn.dataset.fs;
-    settings.fontHeight = btn.dataset.fh;
+    settings.fontSize = btn.dataset.fs; settings.fontHeight = btn.dataset.fh;
     document.documentElement.style.setProperty('--fs-base', settings.fontSize);
     document.documentElement.style.setProperty('--lh-base', settings.fontHeight);
     renderWords();
-    showToast(`🔤 Shrift: ${btn.textContent}`);
   };
 });
 
 document.querySelectorAll('#themeGrid .theme-swatch').forEach(sw => {
   sw.onclick = () => {
     document.querySelectorAll('#themeGrid .theme-swatch').forEach(s => s.classList.remove('active'));
-    sw.classList.add('active');
-    settings.theme = sw.dataset.theme;
+    sw.classList.add('active'); settings.theme = sw.dataset.theme;
     document.body.setAttribute('data-theme', settings.theme);
-    const themeNames = {'default':'Default','ocean':'Ocean','forest':'Forest','sakura':'Sakura','mono':'Mono','blood':'Blood','coffee':'Coffee','nord':'Nord'};
-    showToast(`🎨 Mavzu: ${themeNames[settings.theme] || settings.theme}`);
   };
 });
 
-// Toggle settings
 document.getElementById('showKeyboard').onchange = (e) => { settings.showKeyboard = e.target.checked; dom.keyboardSection.style.display = settings.showKeyboard ? 'flex' : 'none'; };
-document.getElementById('soundEnabled').onchange = (e) => { settings.soundEnabled = e.target.checked; showToast(settings.soundEnabled ? '🔊 Ovoz yoqildi' : '🔇 Ovoz o\'chirildi'); };
+document.getElementById('soundEnabled').onchange = (e) => { settings.soundEnabled = e.target.checked; };
 document.getElementById('smoothCaret').onchange = (e) => { settings.smoothCaret = e.target.checked; if(settings.smoothCaret) dom.caret.classList.add('smooth'); else dom.caret.classList.remove('smooth'); };
-document.getElementById('zenMode').onchange = () => { toggleZenMode(); showToast(settings.zenMode ? '🧘 Zen mode yoqildi' : '🧘 Zen mode o\'chirildi'); };
+document.getElementById('zenMode').onchange = () => { toggleZenMode(); };
+
+// ============ AUTO ZEN MODE ============
+let zenTimeout = null;
+let autoZenEnabled = false;
+
+function activateAutoZen() {
+  if (!settings.zenMode && autoZenEnabled) {
+    settings.zenMode = true;
+    document.getElementById('zenMode').checked = true;
+    
+    const hideSelectors = ['.header', '.mode-tabs', '.sub-options', '.stats-bar', '.sound-selector', '.rank-badge', '.shortcuts-hint'];
+    hideSelectors.forEach(selector => {
+      document.querySelectorAll(selector).forEach(el => {
+        el.style.transition = 'opacity 0.5s ease, visibility 0.5s ease';
+        el.style.opacity = '0';
+        el.style.visibility = 'hidden';
+      });
+    });
+    
+    const keyboardSection = document.querySelector('.keyboard-section');
+    if (keyboardSection) {
+      const isKeyboardVisible = keyboardSection.style.display === 'flex' || getComputedStyle(keyboardSection).display === 'flex';
+      if (isKeyboardVisible) {
+        keyboardSection.style.transition = 'none';
+        keyboardSection.style.opacity = '1';
+        keyboardSection.style.visibility = 'visible';
+      } else {
+        keyboardSection.style.transition = 'opacity 0.5s ease, visibility 0.5s ease';
+        keyboardSection.style.opacity = '0';
+        keyboardSection.style.visibility = 'hidden';
+      }
+    }
+    
+    setTimeout(() => { document.body.classList.add('zen-mode'); }, 500);
+  }
+}
+
+function deactivateAutoZen() {
+  if (settings.zenMode) {
+    settings.zenMode = false;
+    document.getElementById('zenMode').checked = false;
+    document.body.classList.remove('zen-mode');
+    
+    const showSelectors = ['.header', '.mode-tabs', '.sub-options', '.stats-bar', '.sound-selector', '.rank-badge', '.shortcuts-hint', '.keyboard-section'];
+    showSelectors.forEach(selector => {
+      document.querySelectorAll(selector).forEach(el => {
+        el.style.transition = 'opacity 0.5s ease, visibility 0.5s ease';
+        el.style.opacity = '1';
+        el.style.visibility = 'visible';
+      });
+    });
+  }
+  
+  autoZenEnabled = false;
+  clearTimeout(zenTimeout);
+  zenTimeout = setTimeout(() => { autoZenEnabled = true; }, 3000);
+}
+
+document.addEventListener('keydown', (e) => {
+  const overlays = ['resultOverlay', 'settingsOverlay', 'leaderboardOverlay', 'statsOverlay', 'duelOverlay', 'shareOverlay'];
+  const anyOverlayOpen = overlays.some(id => document.getElementById(id)?.classList.contains('open'));
+  if (!anyOverlayOpen && autoZenEnabled && !settings.zenMode) {
+    const ignore = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape', 'Tab', 'Backspace'];
+    if (!ignore.includes(e.key) && e.key.length === 1) { activateAutoZen(); }
+  }
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (e.movementX !== 0 || e.movementY !== 0) { if (settings.zenMode) deactivateAutoZen(); }
+});
+
+document.addEventListener('click', (e) => {
+  if (settings.zenMode && !e.target.closest('.typing-area') && !e.target.closest('.typing-wrapper')) deactivateAutoZen();
+});
+
+document.addEventListener('wheel', () => { if (settings.zenMode) deactivateAutoZen(); });
+
+document.addEventListener('touchstart', (e) => {
+  if (settings.zenMode && !e.target.closest('.typing-area') && !e.target.closest('.typing-wrapper')) deactivateAutoZen();
+});
+
+setTimeout(() => { autoZenEnabled = true; }, 1000);
+
+const zenObserver = new MutationObserver(() => {
+  if (!document.body.classList.contains('zen-mode') && settings.zenMode) {
+    settings.zenMode = false;
+    document.getElementById('zenMode').checked = false;
+  }
+});
+zenObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
 // Start
 fullResetWithNewWords();
@@ -1350,157 +1210,4 @@ dom.keyboardSection.style.display = settings.showKeyboard ? 'flex' : 'none';
 document.body.setAttribute('data-theme', settings.theme);
 if(settings.smoothCaret) dom.caret.classList.add('smooth');
 
-console.log('MR TYPE - Professional Typing Trainer with Center Caret');
-// ============ AUTO ZEN MODE ON TYPING ============
-// ============ AUTO ZEN MODE - Smooth transitions ============
-let zenTimeout = null;
-let autoZenEnabled = false;
-let mouseMoveTimer = null;
-
-// Zen mode ga silliq o'tish
-function activateAutoZen() {
-  if (!settings.zenMode && autoZenEnabled) {
-    settings.zenMode = true;
-    document.getElementById('zenMode').checked = true;
-    
-    // Avval opacity bilan yashirish
-    const elementsToHide = document.querySelectorAll('.header, .mode-tabs, .sub-options, .stats-bar, .sound-selector, .rank-badge, .shortcuts-hint, .keyboard-section');
-    elementsToHide.forEach(el => {
-      el.style.transition = 'opacity 0.4s ease, visibility 0.4s ease';
-      el.style.opacity = '0';
-      el.style.visibility = 'hidden';
-    });
-    
-    // Keyin zen-mode klassini qo'shish
-    setTimeout(() => {
-      document.body.classList.add('zen-mode');
-    }, 400);
-    
-    // Toast
-    const t = document.createElement('div');
-    t.className = 'toast';
-    t.textContent = '🧘 Zen Mode';
-    t.style.animation = 'fadeIn 0.3s ease';
-    dom.toastContainer.appendChild(t);
-    setTimeout(() => {
-      t.style.opacity = '0';
-      t.style.transition = 'opacity 0.3s ease';
-      setTimeout(() => t.remove(), 300);
-    }, 1500);
-  }
-}
-
-// Zen mode dan silliq chiqish
-function deactivateAutoZen() {
-  if (settings.zenMode) {
-    settings.zenMode = false;
-    document.getElementById('zenMode').checked = false;
-    
-    // Avval zen-mode klassini olib tashlash
-    document.body.classList.remove('zen-mode');
-    
-    // Elementlarni silliq ko'rsatish
-    const elementsToShow = document.querySelectorAll('.header, .mode-tabs, .sub-options, .stats-bar, .sound-selector, .rank-badge, .shortcuts-hint, .keyboard-section');
-    elementsToShow.forEach(el => {
-      el.style.transition = 'opacity 0.4s ease, visibility 0.4s ease';
-      el.style.opacity = '1';
-      el.style.visibility = 'visible';
-    });
-    
-    // Toast
-    const t = document.createElement('div');
-    t.className = 'toast';
-   
-    t.style.animation = 'fadeIn 0.3s ease';
-    dom.toastContainer.appendChild(t);
-    setTimeout(() => {
-      t.style.opacity = '0';
-      t.style.transition = 'opacity 0.3s ease';
-      setTimeout(() => t.remove(), 300);
-    }, 1500);
-  }
-  
-  // Sichqoncha harakatini kuzatishni to'xtatish
-  autoZenEnabled = false;
-  
-  // 3 sekunddan keyin yana auto zen tayyor
-  clearTimeout(zenTimeout);
-  zenTimeout = setTimeout(() => {
-    autoZenEnabled = true;
-  }, 3000);
-}
-
-// Klaviatura bosilganda - 3 sekund bexato yozish kutilmaydi, darhol o'tadi
-document.addEventListener('keydown', (e) => {
-  const overlays = ['resultOverlay', 'settingsOverlay', 'leaderboardOverlay', 'statsOverlay', 'duelOverlay', 'shareOverlay'];
-  const anyOverlayOpen = overlays.some(id => document.getElementById(id)?.classList.contains('open'));
-  
-  if (!anyOverlayOpen && autoZenEnabled && !settings.zenMode) {
-    const ignore = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape', 'Tab', 'Backspace'];
-    if (!ignore.includes(e.key) && e.key.length === 1) {
-      activateAutoZen();
-    }
-  }
-});
-
-// Sichqoncha harakatida - faqat haqiqiy harakat bo'lsa
-document.addEventListener('mousemove', (e) => {
-  if (e.movementX !== 0 || e.movementY !== 0) {
-    // Agar Zen mode da bo'lsa, darhol chiqish
-    if (settings.zenMode) {
-      deactivateAutoZen();
-    }
-    
-    // Sichqoncha harakatini qayd etish
-    clearTimeout(mouseMoveTimer);
-    mouseMoveTimer = setTimeout(() => {
-      // Sichqoncha to'xtagandan keyin hech narsa qilmaymiz
-    }, 100);
-  }
-});
-
-// Ekranga bosilganda (typing area dan tashqarida)
-document.addEventListener('click', (e) => {
-  if (settings.zenMode) {
-    // Typing area ichiga bosilsa, Zen mode da qolish
-    if (e.target.closest('.typing-area') || e.target.closest('.typing-wrapper')) {
-      return;
-    }
-    deactivateAutoZen();
-  }
-});
-
-// Scroll qilinsa ham chiqish
-document.addEventListener('wheel', () => {
-  if (settings.zenMode) {
-    deactivateAutoZen();
-  }
-});
-
-// Touch qurilmalar uchun
-document.addEventListener('touchstart', (e) => {
-  if (settings.zenMode) {
-    // Typing area ichiga teginsa chiqmasin
-    if (e.target.closest('.typing-area') || e.target.closest('.typing-wrapper')) {
-      return;
-    }
-    deactivateAutoZen();
-  }
-});
-
-// Page yuklanganda 1 sekunddan keyin auto zen tayyor
-setTimeout(() => {
-  autoZenEnabled = true;
-}, 1000);
-
-// Zen mode holatini kuzatish (settings toggle orqali o'chirilsa)
-const zenObserver = new MutationObserver(() => {
-  if (!document.body.classList.contains('zen-mode') && settings.zenMode) {
-    settings.zenMode = false;
-    document.getElementById('zenMode').checked = false;
-  }
-});
-zenObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-
-console.log('✅ Auto Zen Mode with smooth transitions activated');
-
+console.log('MR TYPE - Professional Typing Trainer');

@@ -309,6 +309,7 @@ input:checked + .slider::before { transform: translateX(16px); background: var(-
 .share-canvas { position: fixed; left: -9999px; top: -9999px; }
 
 /* ============ ZEN MODE - SMOOTH ============ */
+/* ============ ZEN MODE - SMOOTH ============ */
 body.zen-mode .header,
 body.zen-mode .mode-tabs,
 body.zen-mode .sub-options,
@@ -320,22 +321,21 @@ body.zen-mode .shortcuts-hint {
   visibility: hidden !important;
 }
 
-/* Klaviatura - agar sozlamada yoqilgan bo'lsa, Zen Mode da ko'rinadi */
-body.zen-mode .keyboard-section {
-  opacity: 0 !important;
-  visibility: hidden !important;
-}
-
-/* Agar klaviatura display:flex bo'lsa (ya'ni yoqilgan) - Zen Mode da ko'rsatish */
+/* Klaviatura - agar display flex bo'lsa, Zen Mode da ham ko'rinadi */
 body.zen-mode .keyboard-section[style*="display: flex"] {
   opacity: 1 !important;
   visibility: visible !important;
 }
 
+/* Klaviatura - agar display none bo'lsa, Zen Mode da yashirinadi */
+body.zen-mode .keyboard-section[style*="display: none"] {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
 body.zen-mode .main { justify-content: center; padding: 0; }
 body.zen-mode .typing-wrapper { width: 95%; }
 body.zen-mode .typing-area { background: transparent; }
-
 /* ============ RESPONSIVE ============ */
 @media (max-width: 800px) {
   .keyboard-section { display: none; }
