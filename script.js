@@ -1,18 +1,14 @@
-// script.js - MR TYPE Full Professional Version
+// script.js - MR TYPE with CENTER CARET (Monkeytype style)
+// Words scroll from right to left, caret always centered
 
 let audioCtx = null;
 let currentSound = 'blue';
-let currentDuelId = null;
-let duelInterval = null;
-let zenModeTimeout = null;
 
 let gameState = {
   words: [],
-  wordStatus: [],
-  wordTyped: [],
   curWord: 0,
   typedBuf: '',
-  extraChars: [],
+  extraChars: '',
   isRunning: false,
   isFinished: false,
   startTime: 0,
@@ -20,13 +16,9 @@ let gameState = {
   correctKeys: 0,
   wrongKeys: 0,
   wordsCompleted: 0,
-  wordsCorrect: 0,
   timerInt: null,
-  lastCharTime: 0,
-  keyIntervals: [],
-  statsHistory: [],
-  lastSecond: -1,
-  errorMap: {}
+  errorMap: {},
+  wordTyped: []
 };
 
 let settings = {
@@ -44,7 +36,7 @@ let settings = {
 };
 
 let userHistory = [];
-let userName = 'Guest';
+let userName = 'Qosimov Muhammadrasul';
 
 const dom = {
   wordsContainer: document.getElementById('wordsContainer'),
@@ -67,40 +59,47 @@ const dom = {
   soundName: document.getElementById('soundName')
 };
 
-function showToast(message, type = 'info') {
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.textContent = message;
-  dom.toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 2500);
+let wordSpans = [];
+let currentWordSpan = null;
+
+// ============ UTILITIES ============
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  dom.toastContainer.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
 }
 
 function playSound(type) {
   if (!settings.soundEnabled) return;
   if (!audioCtx) {
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch {
-      return;
-    }
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
   }
   const sound = SOUNDS[currentSound];
   if (!sound) return;
-  const freq = type === 'correct' ? sound.freq : sound.errFreq;
   try {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-    osc.frequency.value = freq;
+    osc.frequency.value = type === 'correct' ? sound.correct : sound.error;
     osc.type = sound.type;
     gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + sound.dur);
     osc.start(audioCtx.currentTime);
     osc.stop(audioCtx.currentTime + sound.dur);
-  } catch (e) {
-    console.warn('Audio error:', e);
-  }
+  } catch(e) {}
+}
+
+function highlightKey(key, status) {
+  const el = document.querySelector(`.key[data-key="${key}"]`);
+  if (!el) return;
+  el.classList.remove('pressed', 'pressed-correct', 'pressed-error');
+  if (status === 'press') el.classList.add('pressed');
+  else if (status === 'correct') el.classList.add('pressed-correct');
+  else if (status === 'error') el.classList.add('pressed-error');
+  setTimeout(() => el.classList.remove('pressed', 'pressed-correct', 'pressed-error'), 60);
 }
 
 function getRank(wpm) {
@@ -114,371 +113,341 @@ function updateRankBadge() {
   const best = userHistory.length ? Math.max(...userHistory.map(h => h.wpm)) : 0;
   const rank = getRank(best);
   dom.rankName.textContent = rank.name;
-  const stars = '★'.repeat(rank.stars) + '☆'.repeat(5 - rank.stars);
-  dom.rankStars.textContent = stars;
+  dom.rankStars.textContent = '★'.repeat(rank.stars) + '☆'.repeat(5 - rank.stars);
   dom.rankNext.textContent = rank.next ? `Keyingi: ${rank.next} WPM` : 'Maksimal daraja';
-}
-
-function addToHistory(entry) {
-  userHistory.unshift(entry);
-  if (userHistory.length > 300) userHistory.length = 300;
-  localStorage.setItem('mrtype_history', JSON.stringify(userHistory));
-  updateRankBadge();
-  if (window.mrStatistics) {
-    window.mrStatistics.history = userHistory;
-  }
-}
-
-function loadHistory() {
-  try {
-    userHistory = JSON.parse(localStorage.getItem('mrtype_history') || '[]');
-  } catch {
-    userHistory = [];
-  }
-  updateRankBadge();
-  if (window.mrStatistics) {
-    window.mrStatistics.history = userHistory;
-  }
 }
 
 function generateWords() {
   if (settings.mode === 'quote') return [];
   if (settings.mode === 'dev') return [...DEV_WORDS];
   const pool = WORD_POOLS[settings.lang] || WORD_POOLS.en;
-  const needed = settings.mode === 'words' ? settings.wordsGoal + 50 : 200;
+  const needed = settings.mode === 'words' ? settings.wordsGoal + 20 : 60;
   return Array.from({ length: needed }, () => pool[Math.floor(Math.random() * pool.length)]);
 }
 
 function generateQuote() {
   const pool = QUOTES[settings.lang] || QUOTES.en;
-  const quote = pool[Math.floor(Math.random() * pool.length)];
-  return quote.split(' ');
+  return pool[Math.floor(Math.random() * pool.length)].split(' ');
 }
 
-function initGame() {
-  if (settings.mode === 'quote') {
-    gameState.words = generateQuote();
-  } else {
-    gameState.words = generateWords();
+// ============ RENDER ENGINE ============
+function renderWords() {
+  const words = gameState.words;
+  const curWord = gameState.curWord;
+  
+  if (wordSpans.length !== words.length) {
+    dom.wordsContainer.innerHTML = '';
+    wordSpans = [];
+    for (let i = 0; i < words.length; i++) {
+      const span = document.createElement('span');
+      span.className = 'word';
+      if (i === curWord) span.classList.add('current-word');
+      dom.wordsContainer.appendChild(span);
+      wordSpans[i] = span;
+    }
+    currentWordSpan = wordSpans[curWord];
   }
   
-  gameState.wordStatus = gameState.words.map(() => 'pending');
-  gameState.wordTyped = gameState.words.map(() => '');
-  gameState.curWord = 0;
-  gameState.typedBuf = '';
-  gameState.extraChars = [];
-  gameState.isRunning = false;
-  gameState.isFinished = false;
-  gameState.totalKeys = 0;
-  gameState.correctKeys = 0;
-  gameState.wrongKeys = 0;
-  gameState.wordsCompleted = 0;
-  gameState.wordsCorrect = 0;
-  gameState.keyIntervals = [];
-  gameState.statsHistory = [];
-  gameState.lastSecond = -1;
-  gameState.errorMap = {};
-  
-  renderWords();
-  updateStatsDisplay();
-}
-
-function renderWords() {
-  dom.wordsContainer.innerHTML = '';
-  
-  for (let wi = 0; wi < gameState.words.length; wi++) {
-    const word = gameState.words[wi];
-    if (!word) continue;
-    
-    const wordEl = document.createElement('span');
-    wordEl.className = 'word';
-    if (wi === gameState.curWord) {
-      wordEl.classList.add('current-word');
+  for (let i = 0; i < curWord; i++) {
+    const span = wordSpans[i];
+    if (!span.classList.contains('completed')) {
+      const typed = gameState.wordTyped?.[i] || '';
+      const original = words[i];
+      span.textContent = typed === original ? original : typed;
+      span.classList.add(typed === original ? 'word-correct' : 'word-incorrect', 'completed');
+      span.classList.remove('current-word');
     }
-    wordEl.id = `w${wi}`;
-
-    if (wi < gameState.curWord) {
-      const typed = gameState.wordTyped[wi] || '';
-      const maxLen = Math.max(word.length, typed.length);
-      for (let ci = 0; ci < maxLen; ci++) {
-        const ch = document.createElement('span');
-        ch.className = 'char';
-        if (ci < word.length && ci < typed.length) {
-          ch.textContent = word[ci];
-          ch.classList.add(typed[ci] === word[ci] ? 'correct' : 'incorrect');
-        } else if (ci < word.length) {
-          ch.textContent = word[ci];
-          ch.classList.add('incorrect');
-        } else {
-          ch.textContent = typed[ci];
-          ch.classList.add('extra');
-        }
-        ch.style.fontSize = settings.fontSize;
-        ch.style.height = settings.fontHeight;
-        wordEl.appendChild(ch);
+  }
+  
+  if (currentWordSpan) {
+    const word = words[curWord];
+    const typed = gameState.typedBuf;
+    const extra = gameState.extraChars;
+    let html = '';
+    for (let i = 0; i < word.length; i++) {
+      let cls = 'char';
+      if (i < typed.length) {
+        cls += typed[i] === word[i] ? ' correct' : ' incorrect';
+      } else {
+        cls += ' pending';
       }
-    } else if (wi === gameState.curWord) {
-      for (let ci = 0; ci < word.length; ci++) {
-        const ch = document.createElement('span');
-        ch.className = 'char';
-        ch.id = `c${wi}-${ci}`;
-        ch.textContent = word[ci];
-        ch.style.fontSize = settings.fontSize;
-        ch.style.height = settings.fontHeight;
-        if (ci < gameState.typedBuf.length) {
-          ch.classList.add(gameState.typedBuf[ci] === word[ci] ? 'correct' : 'incorrect');
-        } else {
-          ch.classList.add('pending');
-        }
-        wordEl.appendChild(ch);
-      }
-      for (let ei = 0; ei < gameState.extraChars.length; ei++) {
-        const ch = document.createElement('span');
-        ch.className = 'char extra';
-        ch.textContent = gameState.extraChars[ei];
-        ch.style.fontSize = settings.fontSize;
-        ch.style.height = settings.fontHeight;
-        wordEl.appendChild(ch);
-      }
-    } else {
-      for (let ci = 0; ci < word.length; ci++) {
-        const ch = document.createElement('span');
-        ch.className = 'char pending';
-        ch.textContent = word[ci];
-        ch.style.fontSize = settings.fontSize;
-        ch.style.height = settings.fontHeight;
-        wordEl.appendChild(ch);
-      }
+      html += `<span class="${cls}">${word[i]}</span>`;
     }
-    dom.wordsContainer.appendChild(wordEl);
+    for (let i = 0; i < extra.length; i++) {
+      html += `<span class="char extra">${extra[i]}</span>`;
+    }
+    if (currentWordSpan.innerHTML !== html) currentWordSpan.innerHTML = html;
+  }
+  
+  for (let i = curWord + 1; i < Math.min(curWord + 30, words.length); i++) {
+    const span = wordSpans[i];
+    if (span.textContent !== words[i]) {
+      span.textContent = words[i];
+      span.classList.add('word-future');
+    }
   }
   
   updateCaret();
-  autoScroll();
 }
 
+function updateCurrentWordDisplayFast() {
+  if (!currentWordSpan) return;
+  const word = gameState.words[gameState.curWord];
+  if (!word) return;
+  
+  const typed = gameState.typedBuf;
+  const extra = gameState.extraChars;
+  let html = '';
+  for (let i = 0; i < word.length; i++) {
+    let cls = 'char';
+    if (i < typed.length) {
+      cls += typed[i] === word[i] ? ' correct' : ' incorrect';
+    } else {
+      cls += ' pending';
+    }
+    html += `<span class="${cls}">${word[i]}</span>`;
+  }
+  for (let i = 0; i < extra.length; i++) {
+    html += `<span class="char extra">${extra[i]}</span>`;
+  }
+  if (currentWordSpan.innerHTML !== html) currentWordSpan.innerHTML = html;
+}
+
+// ============ FIXED CARET - Always at center, caret BETWEEN characters ============
 function updateCaret() {
+  if (!currentWordSpan) {
+    dom.caret.style.opacity = '0';
+    return;
+  }
+  
   const word = gameState.words[gameState.curWord];
   if (!word) {
     dom.caret.style.opacity = '0';
     return;
   }
   
-  const afterWord = gameState.typedBuf.length >= word.length;
-  let target = null;
+  const chars = currentWordSpan.querySelectorAll('.char');
+  const typedLen = gameState.typedBuf.length;
   
-  if (!afterWord) {
-    target = document.getElementById(`c${gameState.curWord}-${gameState.typedBuf.length}`);
-  } else {
-    const wordEl = document.getElementById(`w${gameState.curWord}`);
-    if (wordEl) {
-      const chars = wordEl.querySelectorAll('.char');
-      target = chars[chars.length - 1];
-    }
+  let targetChar = null;
+  const aheadIndex = typedLen + 1;
+  
+  if (aheadIndex < word.length) {
+    targetChar = chars[aheadIndex];
+  } else if (typedLen < word.length) {
+    targetChar = chars[word.length - 1];
+  } else if (chars.length > 0) {
+    targetChar = chars[chars.length - 1];
   }
   
-  if (!target) {
+  if (!targetChar) {
     dom.caret.style.opacity = '0';
     return;
   }
   
-  const rect = target.getBoundingClientRect();
   const areaRect = dom.typingArea.getBoundingClientRect();
-  const left = rect.left - areaRect.left + dom.typingArea.scrollLeft;
-  const top = rect.top - areaRect.top + dom.typingArea.scrollTop;
-  const caretX = afterWord ? left + rect.width : left;
+  const caretTargetLeft = areaRect.width / 2;
   
-  dom.caret.style.opacity = '1';
-  dom.caret.style.left = caretX + 'px';
-  dom.caret.style.top = top + 'px';
-  dom.caret.style.height = settings.fontHeight;
-}
-
-function autoScroll() {
-  const currentWord = document.getElementById(`w${gameState.curWord}`);
-  if (!currentWord) return;
+  const containerRect = dom.wordsContainer.getBoundingClientRect();
+  const charRect = targetChar.getBoundingClientRect();
   
-  const container = dom.typingArea;
-  const wordRect = currentWord.getBoundingClientRect();
-  const containerRect = container.getBoundingClientRect();
-  const containerCenter = containerRect.left + containerRect.width / 2;
-  const wordCenter = wordRect.left + wordRect.width / 2;
-  const scrollOffset = wordCenter - containerCenter;
+  const caretWidth = 2;
+  let charOffsetInContainer = charRect.left - containerRect.left;
   
-  if (Math.abs(scrollOffset) > 10) {
-    container.scrollBy({
-      left: scrollOffset,
-      behavior: 'smooth'
-    });
+  if (aheadIndex >= word.length) {
+    charOffsetInContainer += targetChar.offsetWidth + caretWidth + 1;
+  } else {
+    charOffsetInContainer -= caretWidth + 1;
   }
+  
+  const translateX = caretTargetLeft - charOffsetInContainer;
+  
+  dom.wordsContainer.style.transition = 'transform 0.05s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+  dom.wordsContainer.style.transform = `translateX(${translateX}px)`;
+  
+  dom.caret.style.left = caretTargetLeft + 'px';
+  dom.caret.style.top = (charRect.top - areaRect.top) + 'px';
+  dom.caret.style.height = charRect.height + 'px';
+  dom.caret.style.width = caretWidth + 'px';
+  dom.caret.style.opacity = '1';
 }
 
+// ============ GAME CORE ============
 function updateStatsDisplay() {
+  if (!gameState.isRunning && gameState.startTime === 0) return;
+  
   let wpm = 0;
   if (gameState.isRunning) {
     const elapsed = (Date.now() - gameState.startTime) / 60000;
     wpm = elapsed > 0 ? Math.round((gameState.correctKeys / 5) / elapsed) : 0;
   }
-  
   const acc = gameState.totalKeys === 0 ? 100 : Math.round((gameState.correctKeys / gameState.totalKeys) * 100);
   
   dom.liveWpm.textContent = wpm;
   dom.liveAcc.textContent = acc + '%';
-
+  
   if (settings.mode === 'time') {
     if (gameState.isRunning) {
-      const elapsed = (Date.now() - gameState.startTime) / 1000;
-      const left = Math.max(0, settings.duration - Math.floor(elapsed));
+      const left = Math.max(0, settings.duration - Math.floor((Date.now() - gameState.startTime) / 1000));
       dom.liveTimer.textContent = left;
-      dom.timerLabel.textContent = 'Soniya';
       const pct = ((settings.duration - left) / settings.duration) * 100;
       dom.progressFill.style.width = pct + '%';
       dom.progressPercent.textContent = Math.round(pct) + '%';
-      if (left <= 0 && gameState.isRunning) finishGame();
+      if (left <= 0) finishGame();
     } else {
       dom.liveTimer.textContent = settings.duration;
     }
   } else if (settings.mode === 'words') {
     dom.liveTimer.textContent = `${gameState.curWord}/${settings.wordsGoal}`;
-    dom.timerLabel.textContent = 'Soz';
     const pct = (gameState.curWord / settings.wordsGoal) * 100;
     dom.progressFill.style.width = pct + '%';
     dom.progressPercent.textContent = Math.round(pct) + '%';
     if (gameState.curWord >= settings.wordsGoal && gameState.isRunning) finishGame();
   } else if (settings.mode === 'quote') {
     dom.liveTimer.textContent = `${gameState.curWord}/${gameState.words.length}`;
-    dom.timerLabel.textContent = 'Soz';
     const pct = (gameState.curWord / gameState.words.length) * 100;
     dom.progressFill.style.width = pct + '%';
     dom.progressPercent.textContent = Math.round(pct) + '%';
     if (gameState.curWord >= gameState.words.length && gameState.isRunning) finishGame();
-  } else {
-    if (gameState.isRunning) {
-      const elapsed = Math.floor((Date.now() - gameState.startTime) / 1000);
-      dom.liveTimer.textContent = elapsed + 's';
-      dom.timerLabel.textContent = "Otgan";
-    } else {
-      dom.liveTimer.textContent = '0s';
-    }
   }
-
+  
   const total = settings.mode === 'words' ? settings.wordsGoal :
                 settings.mode === 'quote' ? gameState.words.length : '∞';
   dom.liveWords.textContent = `${gameState.wordsCompleted}/${total}`;
-  
-  if (gameState.isRunning && gameState.lastSecond < Math.floor((Date.now() - gameState.startTime) / 1000)) {
-    gameState.lastSecond = Math.floor((Date.now() - gameState.startTime) / 1000);
-    gameState.statsHistory.push({
-      second: gameState.lastSecond,
-      wpm: wpm,
-      acc: acc,
-      errors: gameState.wrongKeys
-    });
-  }
 }
 
 function startGame() {
-  if (gameState.isRunning || gameState.isFinished) return;
-  
+  if (gameState.isRunning) return;
   gameState.isRunning = true;
   gameState.startTime = Date.now();
-  gameState.lastCharTime = Date.now();
-  gameState.lastSecond = -1;
   
+  if (gameState.timerInt) clearInterval(gameState.timerInt);
   gameState.timerInt = setInterval(() => {
     updateStatsDisplay();
-    if (settings.mode === 'time' && gameState.isRunning) {
-      if (Date.now() - gameState.startTime >= settings.duration * 1000) finishGame();
-    }
-  }, 50);
+    if (settings.mode === 'time' && Date.now() - gameState.startTime >= settings.duration * 1000) finishGame();
+    if (settings.mode === 'words' && gameState.curWord >= settings.wordsGoal && gameState.isRunning) finishGame();
+    if (settings.mode === 'quote' && gameState.curWord >= gameState.words.length && gameState.isRunning) finishGame();
+  }, 100);
   
   dom.caret.classList.remove('blink');
   dom.caret.classList.add('typing');
-  if (settings.smoothCaret) dom.caret.classList.add('smooth');
 }
 
 function finishGame() {
   if (gameState.isFinished) return;
-  
   gameState.isFinished = true;
   gameState.isRunning = false;
-  clearInterval(gameState.timerInt);
+  if (gameState.timerInt) clearInterval(gameState.timerInt);
   
   const elapsed = Date.now() - gameState.startTime;
   const netWpm = elapsed > 0 ? Math.round((gameState.correctKeys / 5) / (elapsed / 60000)) : 0;
   const rawWpm = elapsed > 0 ? Math.round((gameState.totalKeys / 5) / (elapsed / 60000)) : 0;
   const acc = gameState.totalKeys === 0 ? 100 : Math.round((gameState.correctKeys / gameState.totalKeys) * 100);
-  const consistency = gameState.keyIntervals.length > 5 ? 85 : 95;
-  const peak = gameState.statsHistory.length ? Math.max(...gameState.statsHistory.map(s => s.wpm)) : netWpm;
   
   const entry = {
-    wpm: netWpm,
-    raw: rawWpm,
-    acc: acc,
-    consistency: consistency,
-    peak: peak,
-    words: gameState.wordsCompleted,
-    time: Math.round(elapsed / 1000),
-    mode: settings.mode,
-    lang: settings.lang,
-    date: new Date().toISOString(),
-    errors: gameState.errorMap
+    wpm: netWpm, raw: rawWpm, acc: acc, words: gameState.wordsCompleted,
+    time: Math.round(elapsed / 1000), mode: settings.mode, date: Date.now()
   };
   
-  addToHistory(entry);
+  userHistory.unshift(entry);
+  if (userHistory.length > 200) userHistory.pop();
+  localStorage.setItem('mrtype_history', JSON.stringify(userHistory));
+  
+  updateRankBadge();
   showResultModal(entry);
   playSound('correct');
 }
 
-function restartGame(newWords = false) {
-  clearInterval(gameState.timerInt);
+function showResultModal(entry) {
+  document.getElementById('resultWpm').textContent = entry.wpm;
+  document.getElementById('resultStats').innerHTML = `
+    <div class="result-stat-card"><div class="result-stat-value" style="color:var(--success)">${entry.acc}%</div><div class="result-stat-label">Aniqlik</div></div>
+    <div class="result-stat-card"><div class="result-stat-value" style="color:var(--info)">${entry.raw}</div><div class="result-stat-label">Raw WPM</div></div>
+    <div class="result-stat-card"><div class="result-stat-value">${entry.words}</div><div class="result-stat-label">Sozlar</div></div>
+    <div class="result-stat-card"><div class="result-stat-value">${entry.time}s</div><div class="result-stat-label">Vaqt</div></div>
+  `;
   
-  if (newWords) {
-    initGame();
-  } else {
-    gameState.curWord = 0;
-    gameState.typedBuf = '';
-    gameState.extraChars = [];
-    gameState.isRunning = false;
-    gameState.isFinished = false;
-    gameState.totalKeys = 0;
-    gameState.correctKeys = 0;
-    gameState.wrongKeys = 0;
-    gameState.wordsCompleted = 0;
-    gameState.wordsCorrect = 0;
-    gameState.keyIntervals = [];
-    gameState.statsHistory = [];
-    gameState.lastSecond = -1;
-    gameState.wordStatus = gameState.words.map(() => 'pending');
-    gameState.wordTyped = gameState.words.map(() => '');
-    renderWords();
-  }
+  window._lastEntry = entry;
+  document.getElementById('resultOverlay').classList.add('open');
+}
+
+function fullResetWithNewWords() {
+  if (gameState.timerInt) clearInterval(gameState.timerInt);
   
+  gameState.words = settings.mode === 'quote' ? generateQuote() : generateWords();
+  gameState.curWord = 0;
+  gameState.typedBuf = '';
+  gameState.extraChars = '';
+  gameState.isRunning = false;
+  gameState.isFinished = false;
+  gameState.startTime = 0;
+  gameState.totalKeys = 0;
+  gameState.correctKeys = 0;
+  gameState.wrongKeys = 0;
+  gameState.wordsCompleted = 0;
+  gameState.wordTyped = [];
+  wordSpans = [];
+  
+  renderWords();
   updateStatsDisplay();
   dom.hiddenInput.value = '';
-  dom.typingArea.classList.remove('blurred');
   dom.hiddenInput.focus();
+  dom.typingArea.classList.remove('blurred');
   dom.caret.classList.remove('typing');
   dom.caret.classList.add('blink');
-  if (settings.smoothCaret) dom.caret.classList.add('smooth');
+  dom.caret.style.opacity = '1';
   document.getElementById('resultOverlay').classList.remove('open');
+}
+
+function sameWordsRestart() {
+  if (gameState.timerInt) clearInterval(gameState.timerInt);
+  
+  gameState.curWord = 0;
+  gameState.typedBuf = '';
+  gameState.extraChars = '';
+  gameState.isRunning = false;
+  gameState.isFinished = false;
+  gameState.startTime = 0;
+  gameState.totalKeys = 0;
+  gameState.correctKeys = 0;
+  gameState.wrongKeys = 0;
+  gameState.wordsCompleted = 0;
+  gameState.wordTyped = [];
+  
+  for (let i = 0; i < wordSpans.length; i++) {
+    const span = wordSpans[i];
+    if (!span) continue;
+    span.textContent = gameState.words[i];
+    span.classList.remove('completed', 'word-correct', 'word-incorrect', 'current-word', 'word-future');
+    span.innerHTML = '';
+  }
+  
+  currentWordSpan = wordSpans[0];
+  if (currentWordSpan) {
+    currentWordSpan.classList.add('current-word');
+  }
+  
+  renderWords();
+  updateStatsDisplay();
+  dom.hiddenInput.value = '';
+  dom.hiddenInput.focus();
+  dom.typingArea.classList.remove('blurred');
+  dom.caret.classList.remove('typing');
+  dom.caret.classList.add('blink');
+  dom.caret.style.opacity = '1';
+  document.getElementById('resultOverlay').classList.remove('open');
+  updateCaret();
 }
 
 function handleChar(char) {
   if (gameState.isFinished) return;
-  if (!gameState.isRunning) startGame();
-
+  if (!gameState.isRunning && gameState.typedBuf.length === 0 && char !== ' ') startGame();
+  
   const word = gameState.words[gameState.curWord];
   if (!word) return;
-
-  const now = Date.now();
-  if (gameState.lastCharTime > 0) {
-    const interval = now - gameState.lastCharTime;
-    if (interval < 1000) gameState.keyIntervals.push(interval);
-  }
-  gameState.lastCharTime = now;
+  
   gameState.totalKeys++;
-
+  
   if (gameState.typedBuf.length < word.length) {
     const expected = word[gameState.typedBuf.length];
     if (char === expected) {
@@ -488,23 +457,21 @@ function handleChar(char) {
       highlightKey(char, 'correct');
     } else {
       gameState.wrongKeys++;
-      gameState.errorMap[char] = (gameState.errorMap[char] || 0) + 1;
-      playSound('error');
       gameState.typedBuf += char;
+      playSound('error');
       highlightKey(char, 'error');
-      dom.typingArea.style.background = 'var(--error-dim)';
-      setTimeout(() => { dom.typingArea.style.background = ''; }, 150);
     }
   } else {
-    if (gameState.extraChars.length < 10) {
-      gameState.extraChars.push(char);
+    if (gameState.extraChars.length < 15) {
+      gameState.extraChars += char;
       gameState.wrongKeys++;
       playSound('error');
       highlightKey(char, 'error');
     }
   }
   
-  renderWords();
+  updateCurrentWordDisplayFast();
+  updateCaret();
   updateStatsDisplay();
 }
 
@@ -512,342 +479,747 @@ function handleBackspace() {
   if (gameState.isFinished) return;
   
   if (gameState.extraChars.length > 0) {
-    gameState.extraChars.pop();
-    renderWords();
+    gameState.extraChars = gameState.extraChars.slice(0, -1);
+    updateCurrentWordDisplayFast();
+    updateCaret();
     return;
   }
   
   if (gameState.typedBuf.length > 0) {
     gameState.typedBuf = gameState.typedBuf.slice(0, -1);
-    renderWords();
-    return;
-  }
-  
-  if (gameState.curWord > 0 && gameState.wordStatus[gameState.curWord - 1] === 'incorrect') {
-    gameState.curWord--;
-    gameState.typedBuf = gameState.wordTyped[gameState.curWord];
-    gameState.wordStatus[gameState.curWord] = 'pending';
-    gameState.wordTyped[gameState.curWord] = '';
-    gameState.wordsCompleted = Math.max(0, gameState.wordsCompleted - 1);
-    renderWords();
+    updateCurrentWordDisplayFast();
+    updateCaret();
   }
 }
 
 function handleSpace() {
   if (gameState.isFinished) return;
-  if (!gameState.isRunning) { startGame(); return; }
-
+  if (gameState.typedBuf.length === 0) return;
+  if (!gameState.isRunning) startGame();
+  
   const word = gameState.words[gameState.curWord];
-  if (!word || gameState.typedBuf.length === 0) return;
-
-  const typed = gameState.typedBuf + gameState.extraChars.join('');
-  const isCorrect = typed === word && gameState.extraChars.length === 0;
-
-  if (isCorrect) {
-    gameState.correctKeys++;
-    gameState.wordStatus[gameState.curWord] = 'correct';
-    gameState.wordsCorrect++;
-  } else {
-    gameState.wordStatus[gameState.curWord] = 'incorrect';
-  }
-
+  const typed = gameState.typedBuf + gameState.extraChars;
+  const isCorrect = typed === word;
+  
+  if (isCorrect) gameState.correctKeys++;
+  
+  if (!gameState.wordTyped) gameState.wordTyped = [];
   gameState.wordTyped[gameState.curWord] = typed;
   gameState.wordsCompleted++;
+  
+  if (wordSpans[gameState.curWord]) {
+    wordSpans[gameState.curWord].textContent = isCorrect ? word : typed;
+    wordSpans[gameState.curWord].classList.add(isCorrect ? 'word-correct' : 'word-incorrect', 'completed');
+    wordSpans[gameState.curWord].classList.remove('current-word');
+  }
+  
   gameState.curWord++;
   gameState.typedBuf = '';
-  gameState.extraChars = [];
-
-  renderWords();
+  gameState.extraChars = '';
+  
+  if (gameState.curWord < wordSpans.length) {
+    currentWordSpan = wordSpans[gameState.curWord];
+    currentWordSpan.classList.add('current-word');
+    updateCurrentWordDisplayFast();
+  }
+  
+  updateCaret();
   updateStatsDisplay();
-
+  
   if (settings.mode === 'words' && gameState.curWord >= settings.wordsGoal) finishGame();
   if (settings.mode === 'quote' && gameState.curWord >= gameState.words.length) finishGame();
 }
 
-function highlightKey(key, status) {
-  const keyEl = document.querySelector(`.key[data-key="${key}"]`);
-  if (!keyEl) return;
-  
-  keyEl.classList.remove('pressed', 'pressed-correct', 'pressed-error');
-  
-  if (status === 'press') {
-    keyEl.classList.add('pressed');
-  } else if (status === 'correct') {
-    keyEl.classList.add('pressed-correct');
-  } else if (status === 'error') {
-    keyEl.classList.add('pressed-error');
-  }
-  
-  setTimeout(() => {
-    keyEl.classList.remove('pressed', 'pressed-correct', 'pressed-error');
-  }, 100);
+function initGame() {
+  gameState.words = settings.mode === 'quote' ? generateQuote() : generateWords();
+  gameState.curWord = 0;
+  gameState.typedBuf = '';
+  gameState.extraChars = '';
+  gameState.isRunning = false;
+  gameState.isFinished = false;
+  gameState.totalKeys = 0;
+  gameState.correctKeys = 0;
+  gameState.wrongKeys = 0;
+  gameState.wordsCompleted = 0;
+  gameState.wordTyped = [];
+  wordSpans = [];
+  renderWords();
+  updateStatsDisplay();
 }
 
-function renderSubOptions() {
-  dom.subOptions.innerHTML = '';
+// ============ STATISTICS FUNCTIONS ============
+function getStatsData() {
+  if (!userHistory.length) return null;
+  const total = userHistory.length;
+  const bestWpm = Math.max(...userHistory.map(h => h.wpm));
+  const avgWpm = Math.round(userHistory.reduce((a,b) => a + b.wpm, 0) / total);
+  const avgAcc = Math.round(userHistory.reduce((a,b) => a + b.acc, 0) / total);
+  const totalTime = userHistory.reduce((a,b) => a + b.time, 0);
+  const totalWords = userHistory.reduce((a,b) => a + b.words, 0);
+  return { total, bestWpm, avgWpm, avgAcc, totalTime, totalWords };
+}
+
+function getWeeklyStats() {
+  const weekData = [];
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dayName = date.toLocaleDateString('uz-UZ', { weekday: 'short' });
+    const dayResults = userHistory.filter(h => new Date(h.date).toDateString() === date.toDateString());
+    const avgWpm = dayResults.length ? Math.round(dayResults.reduce((a,b) => a + b.wpm, 0) / dayResults.length) : 0;
+    weekData.push({ day: dayName, wpm: avgWpm });
+  }
+  return weekData;
+}
+
+function getProgressionStats() {
+  return userHistory.slice(0, 30).reverse().map((h, i) => ({ test: i + 1, wpm: h.wpm, acc: h.acc }));
+}
+
+function getDistributionStats() {
+  const ranges = [
+    { min: 0, max: 20, label: '0-20', count: 0 },
+    { min: 20, max: 40, label: '20-40', count: 0 },
+    { min: 40, max: 60, label: '40-60', count: 0 },
+    { min: 60, max: 80, label: '60-80', count: 0 },
+    { min: 80, max: 100, label: '80-100', count: 0 },
+    { min: 100, max: 120, label: '100-120', count: 0 },
+    { min: 120, max: 150, label: '120-150', count: 0 },
+    { min: 150, max: 999, label: '150+', count: 0 }
+  ];
+  userHistory.forEach(h => {
+    for (const r of ranges) {
+      if (h.wpm >= r.min && h.wpm < r.max) { r.count++; break; }
+    }
+  });
+  return ranges;
+}
+
+function drawProgressionChart(canvasId, data) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !data || data.length === 0) return;
   
-  if (settings.mode === 'time') {
-    [15, 30, 60, 120].forEach(t => {
-      const btn = document.createElement('button');
-      btn.className = 'sub-opt' + (settings.duration === t ? ' active' : '');
-      btn.textContent = t + 's';
-      btn.onclick = () => {
-        settings.duration = t;
-        renderSubOptions();
-        restartGame(true);
-      };
-      dom.subOptions.appendChild(btn);
+  const container = canvas.parentElement;
+  const width = container.clientWidth - 40;
+  const height = 200;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
+  
+  const values = data.map(d => d.wpm);
+  const maxWpm = Math.max(...values, 50);
+  const minWpm = Math.min(...values, 0);
+  const range = maxWpm - minWpm || 1;
+  const padL = 35, padR = 15, padT = 15, padB = 25;
+  const chartW = width - padL - padR;
+  const chartH = height - padT - padB;
+  
+  ctx.beginPath();
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (chartH * i / 4);
+    ctx.moveTo(padL, y);
+    ctx.lineTo(width - padR, y);
+    ctx.stroke();
+    ctx.fillStyle = '#6a6a8a';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(maxWpm - (range * i / 4)), padL - 5, y + 3);
+  }
+  
+  if (data.length > 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = '#e2b714';
+    ctx.lineWidth = 2.5;
+    data.forEach((p, i) => {
+      const x = padL + (i / (data.length - 1)) * chartW;
+      const y = padT + chartH - ((p.wpm - minWpm) / range) * chartH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
-  } else if (settings.mode === 'words') {
-    [25, 50, 100, 200].forEach(w => {
-      const btn = document.createElement('button');
-      btn.className = 'sub-opt' + (settings.wordsGoal === w ? ' active' : '');
-      btn.textContent = w + " soz";
-      btn.onclick = () => {
-        settings.wordsGoal = w;
-        renderSubOptions();
-        restartGame(true);
-      };
-      dom.subOptions.appendChild(btn);
-    });
-  } else if (settings.mode === 'quote') {
-    const btn = document.createElement('button');
-    btn.className = 'sub-opt active';
-    btn.textContent = 'Yangi iqtibos';
-    btn.onclick = () => restartGame(true);
-    dom.subOptions.appendChild(btn);
-  } else if (settings.mode === 'dev') {
-    const btn = document.createElement('button');
-    btn.className = 'sub-opt active';
-    btn.textContent = 'Dasturlash terminallari';
-    dom.subOptions.appendChild(btn);
-  } else if (settings.mode === 'custom') {
-    const btn = document.createElement('button');
-    btn.className = 'sub-opt active';
-    btn.textContent = 'Oz matningizni yozing';
-    btn.onclick = () => {
-      const text = prompt('Matnni kiriting (Enter tugmasini bosib tugatasiz):');
-      if (text) {
-        gameState.words = text.split(' ');
-        gameState.wordStatus = gameState.words.map(() => 'pending');
-        gameState.wordTyped = gameState.words.map(() => '');
-        gameState.curWord = 0;
-        gameState.typedBuf = '';
-        gameState.extraChars = [];
-        renderWords();
-        dom.hiddenInput.focus();
-      }
-    };
-    dom.subOptions.appendChild(btn);
+    ctx.stroke();
+  }
+  
+  data.forEach((p, i) => {
+    const x = padL + (i / (data.length - 1)) * chartW;
+    const y = padT + chartH - ((p.wpm - minWpm) / range) * chartH;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#e2b714';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#0a0a0c';
+    ctx.fill();
+  });
+  
+  ctx.fillStyle = '#6a6a8a';
+  ctx.font = '8px monospace';
+  ctx.textAlign = 'center';
+  const step = Math.ceil(data.length / 6);
+  for (let i = 0; i < data.length; i += step) {
+    const x = padL + (i / (data.length - 1)) * chartW;
+    ctx.fillText(data[i].test, x, height - padB + 12);
   }
 }
 
-function showResultModal(entry) {
-  document.getElementById('resultWpm').textContent = entry.wpm;
+function drawWeeklyChart(canvasId, data) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !data || data.length === 0) return;
   
-  const statsHtml = `
-    <div class="result-stat-card">
-      <div class="result-stat-value" style="color:var(--success)">${entry.acc}%</div>
-      <div class="result-stat-label">Aniqlik</div>
-    </div>
-    <div class="result-stat-card">
-      <div class="result-stat-value" style="color:var(--accent)">${entry.peak}</div>
-      <div class="result-stat-label">Eng yuqori</div>
-    </div>
-    <div class="result-stat-card">
-      <div class="result-stat-value" style="color:var(--info)">${entry.consistency}%</div>
-      <div class="result-stat-label">Barqarorlik</div>
-    </div>
-    <div class="result-stat-card">
-      <div class="result-stat-value">${entry.raw}</div>
-      <div class="result-stat-label">Raw WPM</div>
-    </div>
-    <div class="result-stat-card">
-      <div class="result-stat-value">${entry.words}</div>
-      <div class="result-stat-label">Sozlar</div>
-    </div>
-    <div class="result-stat-card">
-      <div class="result-stat-value">${entry.time}s</div>
-      <div class="result-stat-label">Vaqt</div>
-    </div>
-  `;
+  const container = canvas.parentElement;
+  const width = container.clientWidth - 40;
+  const height = 200;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
   
-  document.getElementById('resultStats').innerHTML = statsHtml;
-  document.getElementById('resultOverlay').classList.add('open');
-}
-
-function loadLeaderboard() {
-  const list = document.getElementById('leaderboardList');
-  list.innerHTML = '<div style="text-align:center;padding:20px">Yuklanmoqda...</div>';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
   
-  const history = userHistory.slice(0, 50).sort((a, b) => b.wpm - a.wpm);
+  const maxWpm = Math.max(...data.map(d => d.wpm), 50);
+  const barWidth = (width - 50) / data.length - 6;
+  const colors = ['#e2b714', '#f0c830', '#d0a010', '#4ec9a0', '#7eb8f7', '#f06a6a', '#b89ef7'];
   
-  if (!history.length) {
-    list.innerHTML = '<div style="text-align:center;padding:20px">Hali natijalar yoq</div>';
-    return;
-  }
-  
-  list.innerHTML = '';
-  history.forEach((h, i) => {
-    const entry = document.createElement('div');
-    entry.className = 'leaderboard-entry';
-    
-    let rankClass = '';
-    if (i === 0) rankClass = 'rank-gold';
-    else if (i === 1) rankClass = 'rank-silver';
-    else if (i === 2) rankClass = 'rank-bronze';
-    
-    entry.innerHTML = `
-      <div class="leaderboard-rank ${rankClass}">${i + 1}</div>
-      <div class="leaderboard-name">${userName}</div>
-      <div class="leaderboard-wpm">${h.wpm}</div>
-      <div style="font-size:0.6rem;color:var(--text-muted)">${h.acc}%</div>
-    `;
-    list.appendChild(entry);
+  data.forEach((item, i) => {
+    const barH = (item.wpm / maxWpm) * (height - 50);
+    const x = 30 + i * (barWidth + 6);
+    const y = height - 25 - barH;
+    ctx.fillStyle = item.wpm > 0 ? colors[i % colors.length] : '#2a2a3a';
+    ctx.fillRect(x, y, barWidth, barH);
+    if (item.wpm > 0) {
+      ctx.fillStyle = '#d0d0ea';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.wpm, x + barWidth/2, y - 4);
+    }
+    ctx.fillStyle = '#6a6a8a';
+    ctx.font = '8px monospace';
+    ctx.fillText(item.day, x + barWidth/2, height - 10);
   });
 }
 
+function drawDistributionChart(canvasId, data) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !data || data.length === 0) return;
+  
+  const container = canvas.parentElement;
+  const width = container.clientWidth - 40;
+  const height = 200;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
+  
+  const total = data.reduce((a,b) => a + b.count, 0);
+  if (total === 0) return;
+  
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+  const barWidth = (width - 50) / data.length - 4;
+  const colors = ['#e2b714', '#f0c830', '#d0a010', '#4ec9a0', '#7eb8f7', '#f06a6a', '#b89ef7', '#88c0d0'];
+  
+  data.forEach((item, i) => {
+    const barH = (item.count / maxCount) * (height - 50);
+    const x = 30 + i * (barWidth + 4);
+    const y = height - 25 - barH;
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(x, y, barWidth, barH);
+    if (item.count > 0) {
+      ctx.fillStyle = '#d0d0ea';
+      ctx.font = '7px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.count, x + barWidth/2, y - 3);
+    }
+    ctx.fillStyle = '#6a6a8a';
+    ctx.font = '7px monospace';
+    ctx.fillText(item.label, x + barWidth/2, height - 8);
+  });
+}
+
+function drawAccuracyChart(canvasId, data) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !data || data.length === 0) return;
+  
+  const container = canvas.parentElement;
+  const width = container.clientWidth - 40;
+  const height = 200;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
+  
+  const values = data.map(d => d.acc);
+  const maxAcc = 100;
+  const minAcc = Math.min(...values, 80);
+  const range = maxAcc - minAcc;
+  const padL = 35, padR = 15, padT = 15, padB = 25;
+  const chartW = width - padL - padR;
+  const chartH = height - padT - padB;
+  
+  ctx.beginPath();
+  ctx.strokeStyle = '#2a2a3a';
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (chartH * i / 4);
+    ctx.moveTo(padL, y);
+    ctx.lineTo(width - padR, y);
+    ctx.stroke();
+    ctx.fillStyle = '#6a6a8a';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(maxAcc - (range * i / 4)) + '%', padL - 5, y + 3);
+  }
+  
+  if (data.length > 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = '#4ec9a0';
+    ctx.lineWidth = 2;
+    data.forEach((p, i) => {
+      const x = padL + (i / (data.length - 1)) * chartW;
+      const y = padT + chartH - ((p.acc - minAcc) / range) * chartH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+  
+  ctx.beginPath();
+  data.forEach((p, i) => {
+    const x = padL + (i / (data.length - 1)) * chartW;
+    const y = padT + chartH - ((p.acc - minAcc) / range) * chartH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(padL + chartW, height - padB);
+  ctx.lineTo(padL, height - padB);
+  ctx.fillStyle = 'rgba(78, 201, 160, 0.1)';
+  ctx.fill();
+  
+  ctx.fillStyle = '#6a6a8a';
+  ctx.font = '8px monospace';
+  ctx.textAlign = 'center';
+  const step = Math.ceil(data.length / 6);
+  for (let i = 0; i < data.length; i += step) {
+    const x = padL + (i / (data.length - 1)) * chartW;
+    ctx.fillText(data[i].test, x, height - padB + 12);
+  }
+}
+
 function loadStats() {
+  const overlay = document.getElementById('statsOverlay');
   const content = document.getElementById('statsContent');
   
   if (!userHistory.length) {
     content.innerHTML = '<div style="text-align:center;padding:40px">Hali natijalar yoq</div>';
+    overlay.classList.add('open');
     return;
   }
   
-  const total = userHistory.length;
-  const best = Math.max(...userHistory.map(h => h.wpm));
-  const avg = Math.round(userHistory.reduce((a, b) => a + b.wpm, 0) / total);
-  const avgAcc = Math.round(userHistory.reduce((a, b) => a + b.acc, 0) / total);
-  const totalTime = userHistory.reduce((a, b) => a + b.time, 0);
+  const stats = getStatsData();
+  const weeklyData = getWeeklyStats();
+  const progression = getProgressionStats();
+  const distribution = getDistributionStats();
+  const rank = getRank(stats.bestWpm);
   
   content.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
-      <div style="background:var(--bg-tertiary);padding:16px;border-radius:8px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:var(--accent)">${total}</div>
-        <div style="font-size:0.55rem;color:var(--text-muted)">Testlar</div>
+    <div class="stats-container" style="padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,var(--accent-dim),transparent);padding:20px;border-radius:16px;margin-bottom:24px">
+        <div>
+          <div style="font-size:2rem;font-weight:900;color:var(--accent)">${rank.name}</div>
+          <div style="color:var(--accent);font-size:1rem">${'★'.repeat(rank.stars)}${'☆'.repeat(5-rank.stars)}</div>
+          <div style="font-size:0.65rem;color:var(--text-dim)">${rank.next ? `Keyingi: ${rank.next} WPM` : 'Maksimal daraja!'}</div>
+        </div>
+        <div style="display:flex;gap:32px">
+          <div><div style="font-size:2rem;font-weight:800;color:var(--accent)">${stats.bestWpm}</div><div style="font-size:0.6rem">Rekord</div></div>
+          <div><div style="font-size:2rem;font-weight:800;color:var(--accent)">${stats.avgWpm}</div><div style="font-size:0.6rem">Ortacha</div></div>
+          <div><div style="font-size:2rem;font-weight:800;color:var(--success)">${stats.avgAcc}%</div><div style="font-size:0.6rem">Aniqlik</div></div>
+        </div>
       </div>
-      <div style="background:var(--bg-tertiary);padding:16px;border-radius:8px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:var(--accent)">${best}</div>
-        <div style="font-size:0.55rem;color:var(--text-muted)">Rekord WPM</div>
+      
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
+        <div style="background:var(--bg3);padding:16px;border-radius:12px;text-align:center"><div style="font-size:1.5rem;font-weight:800;color:var(--info)">${stats.total}</div><div style="font-size:0.55rem">Testlar</div></div>
+        <div style="background:var(--bg3);padding:16px;border-radius:12px;text-align:center"><div style="font-size:1.5rem;font-weight:800;color:var(--info)">${Math.floor(stats.totalTime/60)}m ${stats.totalTime%60}s</div><div style="font-size:0.55rem">Jami vaqt</div></div>
+        <div style="background:var(--bg3);padding:16px;border-radius:12px;text-align:center"><div style="font-size:1.5rem;font-weight:800;color:var(--info)">${stats.totalWords}</div><div style="font-size:0.55rem">Sozlar</div></div>
+        <div style="background:var(--bg3);padding:16px;border-radius:12px;text-align:center"><div style="font-size:1.5rem;font-weight:800;color:var(--accent)">${stats.bestWpm}</div><div style="font-size:0.55rem">Peak</div></div>
       </div>
-      <div style="background:var(--bg-tertiary);padding:16px;border-radius:8px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:var(--accent)">${avg}</div>
-        <div style="font-size:0.55rem;color:var(--text-muted)">Ortacha WPM</div>
+      
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:24px">
+        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">WPM Progression</div><div style="font-size:0.6rem;color:var(--text-dim)">Songi 30 test</div></div><canvas id="progCanvas" style="width:100%;height:200px"></canvas></div>
+        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">Weekly Average</div><div style="font-size:0.6rem;color:var(--text-dim)">Oxirgi 7 kun</div></div><canvas id="weekCanvas" style="width:100%;height:200px"></canvas></div>
+        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">WPM Distribution</div><div style="font-size:0.6rem;color:var(--text-dim)">Natijalar taqsimoti</div></div><canvas id="distCanvas" style="width:100%;height:200px"></canvas></div>
+        <div style="background:var(--bg3);border-radius:12px;padding:16px"><div style="margin-bottom:12px"><div style="font-weight:700">Accuracy Trend</div><div style="font-size:0.6rem;color:var(--text-dim)">Aniqlik ozgarishi</div></div><canvas id="accCanvas" style="width:100%;height:200px"></canvas></div>
       </div>
-      <div style="background:var(--bg-tertiary);padding:16px;border-radius:8px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:var(--success)">${avgAcc}%</div>
-        <div style="font-size:0.55rem;color:var(--text-muted)">Ortacha aniqlik</div>
+      
+      <div style="background:var(--bg3);border-radius:12px;overflow:hidden">
+        <div style="padding:16px;border-bottom:1px solid var(--border);font-weight:700">Songi testlar</div>
+        <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:var(--bg2)"><th style="padding:12px;text-align:left">#</th><th style="padding:12px;text-align:left">WPM</th><th style="padding:12px;text-align:left">Aniqlik</th><th style="padding:12px;text-align:left">Vaqt</th><th style="padding:12px;text-align:left">Sana</th></tr></thead>
+            <tbody>${userHistory.slice(0,20).map((h,i)=>`<tr style="border-top:1px solid var(--border)"><td style="padding:12px">${i+1}</td><td style="padding:12px;color:var(--accent);font-weight:800">${h.wpm}</td><td style="padding:12px;color:var(--success)">${h.acc}%</td><td style="padding:12px">${h.time}s</td><td style="padding:12px;font-size:0.6rem">${new Date(h.date).toLocaleDateString()}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
       </div>
-      <div style="background:var(--bg-tertiary);padding:16px;border-radius:8px;text-align:center">
-        <div style="font-size:1.8rem;font-weight:800;color:var(--info)">${Math.floor(totalTime / 60)}m</div>
-        <div style="font-size:0.55rem;color:var(--text-muted)">Jami vaqt</div>
-      </div>
-    </div>
-    <div style="background:var(--bg-tertiary);border-radius:8px;overflow:hidden">
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr>
-            <th style="padding:10px;text-align:left;font-size:0.6rem;color:var(--text-muted)">#</th>
-            <th style="padding:10px;text-align:left;font-size:0.6rem;color:var(--text-muted)">WPM</th>
-            <th style="padding:10px;text-align:left;font-size:0.6rem;color:var(--text-muted)">Aniqlik</th>
-            <th style="padding:10px;text-align:left;font-size:0.6rem;color:var(--text-muted)">Vaqt</th>
-            <th style="padding:10px;text-align:left;font-size:0.6rem;color:var(--text-muted)">Sana</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${userHistory.slice(0, 30).map((h, i) => `
-            <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px;font-size:0.7rem">${i + 1}</td>
-              <td style="padding:8px;font-size:0.8rem;font-weight:800;color:var(--accent)">${h.wpm}</td>
-              <td style="padding:8px;font-size:0.7rem;color:var(--success)">${h.acc}%</td>
-              <td style="padding:8px;font-size:0.7rem">${h.time}s</td>
-              <td style="padding:8px;font-size:0.6rem;color:var(--text-muted)">${new Date(h.date).toLocaleDateString()}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
     </div>
   `;
+  
+  overlay.classList.add('open');
+  
+  setTimeout(() => {
+    drawProgressionChart('progCanvas', progression);
+    drawWeeklyChart('weekCanvas', weeklyData);
+    drawDistributionChart('distCanvas', distribution);
+    drawAccuracyChart('accCanvas', progression);
+  }, 150);
 }
 
-function shareResult() {
-  const wpm = document.getElementById('resultWpm').textContent;
+function loadLeaderboard() {
+  const list = document.getElementById('leaderboardList');
+  const sorted = [...userHistory].sort((a, b) => b.wpm - a.wpm).slice(0, 30);
+  if (!sorted.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px">Hali natijalar yoq</div>';
+    return;
+  }
+  list.innerHTML = sorted.map((h, i) => `
+    <div class="leaderboard-entry">
+      <div class="leaderboard-rank ${i===0?'rank-gold':i===1?'rank-silver':i===2?'rank-bronze':''}">${i+1}</div>
+      <div class="leaderboard-name">${userName}</div>
+      <div class="leaderboard-wpm">${h.wpm}</div>
+      <div style="font-size:0.6rem;color:var(--text-dim)">${h.acc}%</div>
+    </div>
+  `).join('');
+  document.getElementById('leaderboardOverlay').classList.add('open');
+}
+
+// ============ SHARE FUNCTIONS ============
+function showSharePreview(entry) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+  const best = userHistory.length ? Math.max(...userHistory.map(h => h.wpm)) : entry.wpm;
+  const rank = getRank(best);
+  const avgWpm = userHistory.length > 1 ? Math.round(userHistory.reduce((a,b) => a + b.wpm, 0) / userHistory.length) : entry.wpm;
+  
+  const previewInner = document.getElementById('sharePreviewInner');
+  previewInner.innerHTML = `
+    <div class="share-card-header">
+      <div class="share-card-logo">mt</div>
+      <div class="share-card-brand">mr<span style="color:var(--accent)">type</span></div>
+    </div>
+    <div class="share-card-wpm">${entry.wpm}</div>
+    <div class="share-card-wpm-label">words per minute</div>
+    <div class="share-card-rank">
+      <span class="share-card-rank-name">${rank.name}</span>
+      <span class="share-card-rank-stars">${'★'.repeat(rank.stars)}${'☆'.repeat(5 - rank.stars)}</span>
+    </div>
+    <div class="share-card-stats">
+      <div class="share-card-stat">
+        <div class="share-card-stat-value success">${entry.acc}%</div>
+        <div class="share-card-stat-label">Aniqlik</div>
+      </div>
+      <div class="share-card-stat">
+        <div class="share-card-stat-value info">${entry.raw}</div>
+        <div class="share-card-stat-label">Raw WPM</div>
+      </div>
+      <div class="share-card-stat">
+        <div class="share-card-stat-value">${entry.words}</div>
+        <div class="share-card-stat-label">So'zlar</div>
+      </div>
+      <div class="share-card-stat">
+        <div class="share-card-stat-value accent">${avgWpm}</div>
+        <div class="share-card-stat-label">O'rtacha WPM</div>
+      </div>
+    </div>
+    <div class="share-card-divider"></div>
+    <div class="share-card-meta">
+      <div class="share-card-meta-item">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="share-card-user">${userName}</span>
+      </div>
+      <div class="share-card-meta-item">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="share-card-date">${dateStr} · ${timeStr}</span>
+      </div>
+    </div>
+    <div class="share-card-footer">
+      <div class="share-card-footer-logo">mt</div>
+      <span class="share-card-footer-text">© mrtype.uz · Barcha huquqlar himoyalangan</span>
+    </div>
+  `;
+  
+  document.getElementById('shareOverlay').classList.add('open');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function saveShareAsImage() {
+  const entryData = window._lastEntry;
+  if (!entryData) {
+    showToast('Xatolik: ma\'lumot topilmadi');
+    return;
+  }
+  
   const canvas = document.getElementById('shareCanvas');
   const ctx = canvas.getContext('2d');
   
-  canvas.width = 800;
-  canvas.height = 600;
+  const w = 800;
+  const h = 600;
+  canvas.width = w;
+  canvas.height = h;
   
-  ctx.fillStyle = '#0a0a0c';
-  ctx.fillRect(0, 0, 800, 600);
+  const styles = getComputedStyle(document.body);
+  const bgColor = styles.getPropertyValue('--bg').trim() || '#323437';
+  const bg2Color = styles.getPropertyValue('--bg2').trim() || '#2c2e31';
+  const accentColor = styles.getPropertyValue('--accent').trim() || '#e2b714';
+  const textColor = styles.getPropertyValue('--text').trim() || '#d1d0c5';
+  const textDimColor = styles.getPropertyValue('--text-dim').trim() || '#646669';
+  const borderColor = styles.getPropertyValue('--border').trim() || 'rgba(255,255,255,0.04)';
+  const successColor = styles.getPropertyValue('--success').trim() || '#6ddf6d';
+  const infoColor = styles.getPropertyValue('--info').trim() || '#7eb8f7';
   
-  ctx.fillStyle = '#e2b714';
-  ctx.fillRect(0, 0, 800, 4);
+  // Fon
+  ctx.fillStyle = bgColor;
+  roundRect(ctx, 20, 20, w - 40, h - 40, 20);
+  ctx.fill();
   
-  ctx.font = 'bold 48px "JetBrains Mono", monospace';
-  ctx.fillStyle = '#d0d0ea';
-  ctx.fillText('MR TYPE', 60, 100);
+  // Border
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  roundRect(ctx, 20, 20, w - 40, h - 40, 20);
+  ctx.stroke();
   
-  ctx.font = '900 120px "JetBrains Mono", monospace';
-  ctx.fillStyle = '#e2b714';
-  ctx.fillText(wpm, 60, 280);
+  // Logo
+  ctx.fillStyle = accentColor;
+  roundRect(ctx, 50, 50, 40, 40, 8);
+  ctx.fill();
+  ctx.fillStyle = bgColor;
+  ctx.font = 'bold 18px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('mt', 70, 70);
   
-  ctx.font = '20px "Inter", sans-serif';
-  ctx.fillStyle = '#70708a';
-  ctx.fillText('WORDS PER MINUTE', 60, 330);
+  // Brand
+  ctx.fillStyle = textDimColor;
+  ctx.font = 'bold 20px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('mr', 100, 70);
+  ctx.fillStyle = accentColor;
+  ctx.fillText('type', 130, 70);
   
-  const best = userHistory.length ? Math.max(...userHistory.map(h => h.wpm)) : parseInt(wpm);
-  const rank = getRank(best);
+  // WPM
+  const wpm = entryData.wpm;
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 120px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(wpm, w / 2, 200);
   
-  ctx.font = '24px "Inter", sans-serif';
-  ctx.fillStyle = '#a0a0c0';
-  ctx.fillText(rank.name, 60, 420);
+  // WPM label
+  ctx.fillStyle = textDimColor;
+  ctx.font = '14px "JetBrains Mono", monospace';
+  ctx.fillText('WORDS PER MINUTE', w / 2, 250);
   
-  ctx.font = '14px "Inter", sans-serif';
-  ctx.fillStyle = '#4a4a60';
-  ctx.fillText('mrtype.uz', 60, 560);
+  // Rank
+  const rank = getRank(wpm);
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText(rank.name + '  ' + '★'.repeat(rank.stars) + '☆'.repeat(5 - rank.stars), w / 2, 285);
   
-  const link = document.createElement('a');
-  link.download = `mrtype_${wpm}wpm.png`;
-  link.href = canvas.toDataURL();
-  link.click();
+  // Stats
+  const statY = 320;
+  const statW = (w - 140) / 2;
+  const statH = 70;
+  const gap = 20;
+  const statsList = [
+    { value: entryData.acc + '%', label: 'Aniqlik', color: successColor },
+    { value: entryData.raw, label: 'Raw WPM', color: infoColor },
+    { value: entryData.words, label: 'So\'zlar', color: textColor },
+    { value: Math.round(userHistory.reduce((a,b) => a + b.wpm, 0) / (userHistory.length || 1)), label: 'O\'rtacha WPM', color: accentColor }
+  ];
   
-  showToast('Rasm yuklandi');
+  statsList.forEach((stat, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = 60 + col * (statW + gap);
+    const y = statY + row * (statH + gap);
+    
+    ctx.fillStyle = bg2Color;
+    roundRect(ctx, x, y, statW, statH, 12);
+    ctx.fill();
+    
+    ctx.fillStyle = stat.color;
+    ctx.font = 'bold 26px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(stat.value, x + statW / 2, y + statH / 2 - 8);
+    
+    ctx.fillStyle = textDimColor;
+    ctx.font = '11px monospace';
+    ctx.fillText(stat.label, x + statW / 2, y + statH / 2 + 18);
+  });
+  
+  // Divider
+  const dividerY = statY + 2 * (statH + gap) + 20;
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(60, dividerY);
+  ctx.lineTo(w - 60, dividerY);
+  ctx.stroke();
+  
+  // Meta
+  const metaY = dividerY + 30;
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+  
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('👤 ' + userName, 65, metaY);
+  
+  ctx.fillStyle = textDimColor;
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('📅 ' + dateStr + ' · ' + timeStr, w - 65, metaY);
+  
+  // Footer
+  ctx.fillStyle = accentColor;
+  roundRect(ctx, 60, h - 80, 22, 22, 5);
+  ctx.fill();
+  ctx.fillStyle = bgColor;
+  ctx.font = 'bold 10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('mt', 71, h - 69);
+  
+  ctx.fillStyle = textDimColor;
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('© mrtype.uz · Barcha huquqlar himoyalangan', 90, h - 69);
+  
+  // Yuklash
+  const a = document.createElement('a');
+  a.download = `mrtype_${wpm}wpm.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+  
+  document.getElementById('shareOverlay').classList.remove('open');
+  showToast('✅ Rasm saqlandi!');
+}
+
+function shareResult() {
+  const entry = window._lastEntry;
+  if (!entry) {
+    showToast('Avval test yakunlang!');
+    return;
+  }
+  document.getElementById('resultOverlay').classList.remove('open');
+  showSharePreview(entry);
 }
 
 function changeSound() {
   const sounds = ['blue', 'brown', 'red', 'creamy', 'thock'];
-  const currentIndex = sounds.indexOf(currentSound);
-  const nextIndex = (currentIndex + 1) % sounds.length;
-  currentSound = sounds[nextIndex];
-  
-  const names = {
-    blue: 'Blue Switch',
-    brown: 'Brown Switch',
-    red: 'Red Switch',
-    creamy: 'Creamy',
-    thock: 'Thock'
-  };
-  
+  const idx = (sounds.indexOf(currentSound) + 1) % sounds.length;
+  currentSound = sounds[idx];
+  const names = {blue:'Blue Switch',brown:'Brown Switch',red:'Red Switch',creamy:'Creamy',thock:'Thock'};
   dom.soundName.textContent = names[currentSound];
   showToast(`Ovoz: ${names[currentSound]}`);
 }
 
-function toggleZenMode() {
-  settings.zenMode = document.getElementById('zenMode').checked;
-  if (settings.zenMode) {
-    document.body.classList.add('zen-mode');
-  } else {
-    document.body.classList.remove('zen-mode');
+function focusInput() { 
+  dom.hiddenInput.focus(); 
+  dom.typingArea.classList.remove('blurred'); 
+}
+
+function renderSubOptions() {
+  dom.subOptions.innerHTML = '';
+  if (settings.mode === 'time') {
+    [15,30,60,120].forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'sub-opt' + (settings.duration === t ? ' active' : '');
+      b.textContent = t + 's';
+      b.onclick = () => { settings.duration = t; renderSubOptions(); fullResetWithNewWords(); };
+      dom.subOptions.appendChild(b);
+    });
+  } else if (settings.mode === 'words') {
+    [25,50,100,200].forEach(w => {
+      const b = document.createElement('button');
+      b.className = 'sub-opt' + (settings.wordsGoal === w ? ' active' : '');
+      b.textContent = w + " soz";
+      b.onclick = () => { settings.wordsGoal = w; renderSubOptions(); fullResetWithNewWords(); };
+      dom.subOptions.appendChild(b);
+    });
+  } else if (settings.mode === 'quote') {
+    const b = document.createElement('button');
+    b.className = 'sub-opt active';
+    b.textContent = 'Yangi iqtibos';
+    b.onclick = () => fullResetWithNewWords();
+    dom.subOptions.appendChild(b);
+  } else if (settings.mode === 'dev') {
+    const b = document.createElement('button');
+    b.className = 'sub-opt active';
+    b.textContent = 'Dasturlash';
+    dom.subOptions.appendChild(b);
+  } else if (settings.mode === 'custom') {
+    const b = document.createElement('button');
+    b.className = 'sub-opt active';
+    b.textContent = 'Oz matn';
+    b.onclick = () => {
+      const text = prompt('Matnni kiriting:');
+      if (text) {
+        gameState.words = text.split(' ');
+        gameState.curWord = 0;
+        gameState.typedBuf = '';
+        gameState.extraChars = '';
+        gameState.wordTyped = [];
+        wordSpans = [];
+        renderWords();
+        dom.hiddenInput.focus();
+      }
+    };
+    dom.subOptions.appendChild(b);
   }
 }
 
-function focusInput() {
-  dom.hiddenInput.focus();
-  dom.typingArea.classList.remove('blurred');
-  dom.typingArea.classList.add('focused');
+function toggleZenMode() {
+  settings.zenMode = document.getElementById('zenMode').checked;
+  document.body.classList.toggle('zen-mode', settings.zenMode);
 }
+
+// ============ INITIALIZATION ============
+try {
+  const saved = localStorage.getItem('mrtype_history');
+  if (saved) userHistory = JSON.parse(saved);
+} catch(e) { userHistory = []; }
+updateRankBadge();
 
 // Event Listeners
 document.querySelectorAll('.mode-tab').forEach(tab => {
@@ -856,104 +1228,85 @@ document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.classList.add('active');
     settings.mode = tab.dataset.mode;
     renderSubOptions();
-    initGame();
-    restartGame(true);
+    fullResetWithNewWords();
   });
 });
 
 document.addEventListener('keydown', (e) => {
-  const overlays = ['resultOverlay', 'settingsOverlay', 'leaderboardOverlay', 'statsOverlay', 'duelOverlay'];
-  const anyOpen = overlays.some(id => document.getElementById(id).classList.contains('open'));
-  
-  if (anyOpen) {
+  const overlays = ['resultOverlay', 'settingsOverlay', 'leaderboardOverlay', 'statsOverlay', 'duelOverlay', 'shareOverlay'];
+  if (overlays.some(id => document.getElementById(id)?.classList.contains('open'))) {
     if (e.key === 'Escape') {
-      overlays.forEach(id => document.getElementById(id).classList.remove('open'));
+      overlays.forEach(id => document.getElementById(id)?.classList.remove('open'));
       focusInput();
     }
     return;
   }
   
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    restartGame(false);
-    return;
+  if (e.key === 'Tab') { 
+    e.preventDefault(); 
+    sameWordsRestart();
+    showToast('🔁 Qayta boshlandi');
+    return; 
   }
   
-  if (e.ctrlKey && e.key === 'r') {
-    e.preventDefault();
-    restartGame(true);
-    return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'r') { 
+    e.preventDefault(); 
+    fullResetWithNewWords();
+    showToast('🔄 Yangi so\'zlar yuklandi');
+    return; 
   }
   
-  if (e.key === 'Enter' && settings.mode === 'custom' && gameState.isRunning) {
-    finishGame();
-    return;
-  }
-  
-  const ignoreKeys = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
-  if (ignoreKeys.includes(e.key)) return;
-  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const ignore = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  if (ignore.includes(e.key) || e.ctrlKey || e.altKey) return;
   
   e.preventDefault();
   highlightKey(e.key.toLowerCase(), 'press');
   
-  if (e.key === 'Backspace') {
-    handleBackspace();
-  } else if (e.key === ' ') {
-    handleSpace();
-  } else if (e.key.length === 1) {
-    handleChar(e.key);
-  }
+  if (e.key === 'Backspace') handleBackspace();
+  else if (e.key === ' ') handleSpace();
+  else if (e.key.length === 1) handleChar(e.key);
 });
 
-document.addEventListener('keyup', (e) => {
-  highlightKey(e.key.toLowerCase(), null);
-});
-
+document.addEventListener('keyup', (e) => highlightKey(e.key.toLowerCase(), null));
 dom.typingArea.addEventListener('click', focusInput);
 dom.hiddenInput.addEventListener('blur', () => dom.typingArea.classList.add('blurred'));
 dom.hiddenInput.addEventListener('focus', () => dom.typingArea.classList.remove('blurred'));
 
+// ============ BUTTON HANDLERS ============
 document.getElementById('settingsBtn').onclick = () => document.getElementById('settingsOverlay').classList.add('open');
-document.getElementById('settingsClose').onclick = () => document.getElementById('settingsOverlay').classList.remove('open');
-
-document.getElementById('leaderboardBtn').onclick = () => {
-  loadLeaderboard();
-  document.getElementById('leaderboardOverlay').classList.add('open');
-};
-document.getElementById('leaderboardClose').onclick = () => document.getElementById('leaderboardOverlay').classList.remove('open');
-
-document.getElementById('statsBtn').onclick = () => {
-  loadStats();
-  document.getElementById('statsOverlay').classList.add('open');
-};
-document.getElementById('statsClose').onclick = () => document.getElementById('statsOverlay').classList.remove('open');
-
-document.getElementById('duelBtn').onclick = () => {
-  document.getElementById('duelContent').innerHTML = '<div style="text-align:center;padding:40px">Duel mode ishlab chiqilmoqda</div>';
-  document.getElementById('duelOverlay').classList.add('open');
-};
-document.getElementById('duelClose').onclick = () => document.getElementById('duelOverlay').classList.remove('open');
-
+document.getElementById('settingsClose').onclick = () => { document.getElementById('settingsOverlay').classList.remove('open'); focusInput(); };
+document.getElementById('leaderboardBtn').onclick = () => loadLeaderboard();
+document.getElementById('leaderboardClose').onclick = () => { document.getElementById('leaderboardOverlay').classList.remove('open'); focusInput(); };
+document.getElementById('statsBtn').onclick = () => loadStats();
+document.getElementById('statsCloseBtn').onclick = () => { document.getElementById('statsOverlay').classList.remove('open'); focusInput(); };
+document.getElementById('duelBtn').onclick = () => { document.getElementById('duelContent').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">⚔️ Duel mode ishlab chiqilmoqda...</div>'; document.getElementById('duelOverlay').classList.add('open'); };
+document.getElementById('duelClose').onclick = () => { document.getElementById('duelOverlay').classList.remove('open'); focusInput(); };
 document.getElementById('shareResultBtn').onclick = () => shareResult();
-document.getElementById('newWordsBtn').onclick = () => {
-  document.getElementById('resultOverlay').classList.remove('open');
-  restartGame(true);
-};
-document.getElementById('restartResultBtn').onclick = () => {
-  document.getElementById('resultOverlay').classList.remove('open');
-  restartGame(false);
-};
-
+document.getElementById('sharePreviewClose').onclick = () => { document.getElementById('shareOverlay').classList.remove('open'); focusInput(); };
+document.getElementById('shareCancelBtn').onclick = () => { document.getElementById('shareOverlay').classList.remove('open'); focusInput(); };
+document.getElementById('shareSaveBtn').onclick = () => saveShareAsImage();
+document.getElementById('newWordsBtn').onclick = () => { document.getElementById('resultOverlay').classList.remove('open'); fullResetWithNewWords(); showToast('🔄 Yangi so\'zlar yuklandi'); };
+document.getElementById('restartResultBtn').onclick = () => { document.getElementById('resultOverlay').classList.remove('open'); sameWordsRestart(); showToast('🔁 Qayta boshlandi'); };
 document.getElementById('soundBtn').onclick = () => changeSound();
 
+// Overlay outside click
+['settingsOverlay', 'leaderboardOverlay', 'statsOverlay', 'resultOverlay', 'duelOverlay', 'shareOverlay'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) {
+      this.classList.remove('open');
+      focusInput();
+    }
+  });
+});
+
+// Settings panel
 document.querySelectorAll('#langOptions .settings-btn').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('#langOptions .settings-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     settings.lang = btn.dataset.lang;
-    restartGame(true);
-    showToast(`Til: ${btn.textContent}`);
+    fullResetWithNewWords();
+    showToast(`🌐 Til: ${btn.textContent}`);
   };
 });
 
@@ -963,9 +1316,10 @@ document.querySelectorAll('#fontSizeOptions .settings-btn').forEach(btn => {
     btn.classList.add('active');
     settings.fontSize = btn.dataset.fs;
     settings.fontHeight = btn.dataset.fh;
-    document.documentElement.style.setProperty('--char-fs', settings.fontSize);
-    document.documentElement.style.setProperty('--char-h', settings.fontHeight);
+    document.documentElement.style.setProperty('--fs-base', settings.fontSize);
+    document.documentElement.style.setProperty('--lh-base', settings.fontHeight);
     renderWords();
+    showToast(`🔤 Shrift: ${btn.textContent}`);
   };
 });
 
@@ -975,34 +1329,178 @@ document.querySelectorAll('#themeGrid .theme-swatch').forEach(sw => {
     sw.classList.add('active');
     settings.theme = sw.dataset.theme;
     document.body.setAttribute('data-theme', settings.theme);
-    showToast(`Mavzu: ${settings.theme}`);
+    const themeNames = {'default':'Default','ocean':'Ocean','forest':'Forest','sakura':'Sakura','mono':'Mono','blood':'Blood','coffee':'Coffee','nord':'Nord'};
+    showToast(`🎨 Mavzu: ${themeNames[settings.theme] || settings.theme}`);
   };
 });
 
-document.getElementById('showKeyboard').onchange = (e) => {
-  settings.showKeyboard = e.target.checked;
-  dom.keyboardSection.style.display = settings.showKeyboard ? 'flex' : 'none';
-};
+// Toggle settings
+document.getElementById('showKeyboard').onchange = (e) => { settings.showKeyboard = e.target.checked; dom.keyboardSection.style.display = settings.showKeyboard ? 'flex' : 'none'; };
+document.getElementById('soundEnabled').onchange = (e) => { settings.soundEnabled = e.target.checked; showToast(settings.soundEnabled ? '🔊 Ovoz yoqildi' : '🔇 Ovoz o\'chirildi'); };
+document.getElementById('smoothCaret').onchange = (e) => { settings.smoothCaret = e.target.checked; if(settings.smoothCaret) dom.caret.classList.add('smooth'); else dom.caret.classList.remove('smooth'); };
+document.getElementById('zenMode').onchange = () => { toggleZenMode(); showToast(settings.zenMode ? '🧘 Zen mode yoqildi' : '🧘 Zen mode o\'chirildi'); };
 
-document.getElementById('soundEnabled').onchange = (e) => {
-  settings.soundEnabled = e.target.checked;
-};
-
-document.getElementById('smoothCaret').onchange = (e) => {
-  settings.smoothCaret = e.target.checked;
-};
-
-document.getElementById('zenMode').onchange = () => toggleZenMode();
-
-// Initialization
-loadHistory();
-initGame();
+// Start
+fullResetWithNewWords();
 renderSubOptions();
 focusInput();
-
-document.documentElement.style.setProperty('--char-fs', settings.fontSize);
-document.documentElement.style.setProperty('--char-h', settings.fontHeight);
+document.documentElement.style.setProperty('--fs-base', settings.fontSize);
+document.documentElement.style.setProperty('--lh-base', settings.fontHeight);
 dom.keyboardSection.style.display = settings.showKeyboard ? 'flex' : 'none';
 document.body.setAttribute('data-theme', settings.theme);
+if(settings.smoothCaret) dom.caret.classList.add('smooth');
 
-console.log('MR TYPE - Professional Typing Trainer loaded!');
+console.log('MR TYPE - Professional Typing Trainer with Center Caret');
+// ============ AUTO ZEN MODE ON TYPING ============
+// ============ AUTO ZEN MODE - Smooth transitions ============
+let zenTimeout = null;
+let autoZenEnabled = false;
+let mouseMoveTimer = null;
+
+// Zen mode ga silliq o'tish
+function activateAutoZen() {
+  if (!settings.zenMode && autoZenEnabled) {
+    settings.zenMode = true;
+    document.getElementById('zenMode').checked = true;
+    
+    // Avval opacity bilan yashirish
+    const elementsToHide = document.querySelectorAll('.header, .mode-tabs, .sub-options, .stats-bar, .sound-selector, .rank-badge, .shortcuts-hint, .keyboard-section');
+    elementsToHide.forEach(el => {
+      el.style.transition = 'opacity 0.4s ease, visibility 0.4s ease';
+      el.style.opacity = '0';
+      el.style.visibility = 'hidden';
+    });
+    
+    // Keyin zen-mode klassini qo'shish
+    setTimeout(() => {
+      document.body.classList.add('zen-mode');
+    }, 400);
+    
+    // Toast
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = '🧘 Zen Mode';
+    t.style.animation = 'fadeIn 0.3s ease';
+    dom.toastContainer.appendChild(t);
+    setTimeout(() => {
+      t.style.opacity = '0';
+      t.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => t.remove(), 300);
+    }, 1500);
+  }
+}
+
+// Zen mode dan silliq chiqish
+function deactivateAutoZen() {
+  if (settings.zenMode) {
+    settings.zenMode = false;
+    document.getElementById('zenMode').checked = false;
+    
+    // Avval zen-mode klassini olib tashlash
+    document.body.classList.remove('zen-mode');
+    
+    // Elementlarni silliq ko'rsatish
+    const elementsToShow = document.querySelectorAll('.header, .mode-tabs, .sub-options, .stats-bar, .sound-selector, .rank-badge, .shortcuts-hint, .keyboard-section');
+    elementsToShow.forEach(el => {
+      el.style.transition = 'opacity 0.4s ease, visibility 0.4s ease';
+      el.style.opacity = '1';
+      el.style.visibility = 'visible';
+    });
+    
+    // Toast
+    const t = document.createElement('div');
+    t.className = 'toast';
+   
+    t.style.animation = 'fadeIn 0.3s ease';
+    dom.toastContainer.appendChild(t);
+    setTimeout(() => {
+      t.style.opacity = '0';
+      t.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => t.remove(), 300);
+    }, 1500);
+  }
+  
+  // Sichqoncha harakatini kuzatishni to'xtatish
+  autoZenEnabled = false;
+  
+  // 3 sekunddan keyin yana auto zen tayyor
+  clearTimeout(zenTimeout);
+  zenTimeout = setTimeout(() => {
+    autoZenEnabled = true;
+  }, 3000);
+}
+
+// Klaviatura bosilganda - 3 sekund bexato yozish kutilmaydi, darhol o'tadi
+document.addEventListener('keydown', (e) => {
+  const overlays = ['resultOverlay', 'settingsOverlay', 'leaderboardOverlay', 'statsOverlay', 'duelOverlay', 'shareOverlay'];
+  const anyOverlayOpen = overlays.some(id => document.getElementById(id)?.classList.contains('open'));
+  
+  if (!anyOverlayOpen && autoZenEnabled && !settings.zenMode) {
+    const ignore = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape', 'Tab', 'Backspace'];
+    if (!ignore.includes(e.key) && e.key.length === 1) {
+      activateAutoZen();
+    }
+  }
+});
+
+// Sichqoncha harakatida - faqat haqiqiy harakat bo'lsa
+document.addEventListener('mousemove', (e) => {
+  if (e.movementX !== 0 || e.movementY !== 0) {
+    // Agar Zen mode da bo'lsa, darhol chiqish
+    if (settings.zenMode) {
+      deactivateAutoZen();
+    }
+    
+    // Sichqoncha harakatini qayd etish
+    clearTimeout(mouseMoveTimer);
+    mouseMoveTimer = setTimeout(() => {
+      // Sichqoncha to'xtagandan keyin hech narsa qilmaymiz
+    }, 100);
+  }
+});
+
+// Ekranga bosilganda (typing area dan tashqarida)
+document.addEventListener('click', (e) => {
+  if (settings.zenMode) {
+    // Typing area ichiga bosilsa, Zen mode da qolish
+    if (e.target.closest('.typing-area') || e.target.closest('.typing-wrapper')) {
+      return;
+    }
+    deactivateAutoZen();
+  }
+});
+
+// Scroll qilinsa ham chiqish
+document.addEventListener('wheel', () => {
+  if (settings.zenMode) {
+    deactivateAutoZen();
+  }
+});
+
+// Touch qurilmalar uchun
+document.addEventListener('touchstart', (e) => {
+  if (settings.zenMode) {
+    // Typing area ichiga teginsa chiqmasin
+    if (e.target.closest('.typing-area') || e.target.closest('.typing-wrapper')) {
+      return;
+    }
+    deactivateAutoZen();
+  }
+});
+
+// Page yuklanganda 1 sekunddan keyin auto zen tayyor
+setTimeout(() => {
+  autoZenEnabled = true;
+}, 1000);
+
+// Zen mode holatini kuzatish (settings toggle orqali o'chirilsa)
+const zenObserver = new MutationObserver(() => {
+  if (!document.body.classList.contains('zen-mode') && settings.zenMode) {
+    settings.zenMode = false;
+    document.getElementById('zenMode').checked = false;
+  }
+});
+zenObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+console.log('✅ Auto Zen Mode with smooth transitions activated');
+

@@ -1,4 +1,3 @@
-<!-- index.html - To'liq tuzatilgan versiya (statistika paneli to'g'ri yopiladi) -->
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -7,41 +6,53 @@
 <title>MR TYPE | Professional Typing Trainer</title>
 <meta name="description" content="Professional klaviatura yozish trenajyori">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100..800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100..800&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e2b714'/%3E%3Ctext x='50%25' y='60%25' dominant-baseline='middle' text-anchor='middle' fill='black' font-family='monospace' font-weight='900' font-size='14'%3Emt%3C/text%3E%3C/svg%3E">
 </head>
-<body>
+<body data-theme="default">
 
-<header class="header">
+<header class="header" id="mainHeader">
   <div class="logo" id="logo">
     <div class="logo-box">mt</div>
     mr<span class="logo-accent">type</span>
   </div>
   <nav class="header-nav">
-    <button class="nav-btn" id="statsBtn"> Statistika</button>
-    <button class="nav-btn" id="leaderboardBtn"> Top</button>
-    <button class="nav-btn" id="duelBtn"> Duel</button>
-    <div class="divider"></div>
-    <button class="nav-btn" id="settingsBtn"> Sozlamalar</button>
+    <button class="nav-btn" id="statsBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Statistika
+    </button>
+    <button class="nav-btn" id="leaderboardBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Top
+    </button>
+    <button class="nav-btn" id="duelBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Duel
+    </button>
+    <div class="nav-divider"></div>
+    <button class="nav-btn" id="settingsBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Sozlamalar
+    </button>
     <div class="user-info" id="userInfo">
-      <span class="user-name" id="userName">Guest</span>
+      <span class="user-name" id="userName">User</span>
     </div>
   </nav>
 </header>
 
-<main class="main">
+<main class="main" id="mainContent">
   <div class="mode-tabs" id="modeTabs">
-    <button class="mode-tab active" data-mode="time"> Vaqt</button>
-    <button class="mode-tab" data-mode="words"> Sozlar</button>
-    <button class="mode-tab" data-mode="quote"> Iqtibos</button>
-    <button class="mode-tab" data-mode="dev"> Dev</button>
-    <button class="mode-tab" data-mode="custom"> Maxsus</button>
+    <button class="mode-tab active" data-mode="time">Vaqt</button>
+    <button class="mode-tab" data-mode="words">So'zlar</button>
+    <button class="mode-tab" data-mode="quote">Iqtibos</button>
+    <button class="mode-tab" data-mode="dev">Dev</button>
+    <button class="mode-tab" data-mode="custom">Maxsus</button>
   </div>
 
   <div class="sub-options" id="subOptions"></div>
 
-  <div class="stats-bar">
+  <div class="stats-bar" id="statsBar">
     <div class="stat">
       <div class="stat-value wpm-value" id="liveWpm">0</div>
       <div class="stat-label">WPM</div>
@@ -59,7 +70,7 @@
     <div class="stat-divider"></div>
     <div class="stat">
       <div class="stat-value words-value" id="liveWords">0/0</div>
-      <div class="stat-label">Sozlar</div>
+      <div class="stat-label">So'zlar</div>
     </div>
     <div class="stat-divider"></div>
     <div class="progress-section">
@@ -76,104 +87,120 @@
   <div class="typing-wrapper">
     <div class="typing-area blurred" id="typingArea">
       <div class="caret blink" id="caret"></div>
-      <input type="text" id="hiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <input type="text" id="hiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Yozish maydoni">
       <div class="words-container" id="wordsContainer"></div>
     </div>
-    <div class="shortcuts-hint">
-      <span class="kbd-badge">Tab</span> qayta boshlash
-      <span class="kbd-badge">Ctrl+R</span> yangi sozlar
-      <span class="kbd-badge">Enter</span> tugatish
+    <div class="shortcuts-hint" id="shortcutsHint">
+      <span class="kbd-badge">Tab</span> qayta boshlash &nbsp;
+      <span class="kbd-badge">Ctrl+R</span> yangi so'zlar &nbsp;
+      <span class="kbd-badge">Esc</span> yopish
     </div>
   </div>
 
   <div class="keyboard-section" id="keyboardSection">
     <div class="keyboard" id="keyboard">
       <div class="key-row">
-        <div class="key" data-key="tab">Tab</div>
-        <div class="key" data-key="q">q</div><div class="key" data-key="w">w</div>
-        <div class="key" data-key="e">e</div><div class="key" data-key="r">r</div>
-        <div class="key" data-key="t">t</div><div class="key" data-key="y">y</div>
-        <div class="key" data-key="u">u</div><div class="key" data-key="i">i</div>
-        <div class="key" data-key="o">o</div><div class="key" data-key="p">p</div>
-        <div class="key" data-key="backspace">⌫</div>
+        <div class="key wide" data-key="tab">Tab</div>
+        <div class="key" data-key="q">q</div>
+        <div class="key" data-key="w">w</div>
+        <div class="key" data-key="e">e</div>
+        <div class="key" data-key="r">r</div>
+        <div class="key" data-key="t">t</div>
+        <div class="key" data-key="y">y</div>
+        <div class="key" data-key="u">u</div>
+        <div class="key" data-key="i">i</div>
+        <div class="key" data-key="o">o</div>
+        <div class="key" data-key="p">p</div>
+        <div class="key wide" data-key="backspace">&#9003;</div>
       </div>
       <div class="key-row">
-        <div class="key" data-key="caps">Caps</div>
-        <div class="key" data-key="a">a</div><div class="key" data-key="s">s</div>
-        <div class="key" data-key="d">d</div><div class="key" data-key="f">f</div>
-        <div class="key" data-key="g">g</div><div class="key" data-key="h">h</div>
-        <div class="key" data-key="j">j</div><div class="key" data-key="k">k</div>
-        <div class="key" data-key="l">l</div><div class="key" data-key=";">;</div>
-        <div class="key" data-key="enter">Enter</div>
+        <div class="key wider" data-key="caps">Caps</div>
+        <div class="key" data-key="a">a</div>
+        <div class="key" data-key="s">s</div>
+        <div class="key" data-key="d">d</div>
+        <div class="key" data-key="f">f</div>
+        <div class="key" data-key="g">g</div>
+        <div class="key" data-key="h">h</div>
+        <div class="key" data-key="j">j</div>
+        <div class="key" data-key="k">k</div>
+        <div class="key" data-key="l">l</div>
+        <div class="key" data-key=";">;</div>
+        <div class="key wider" data-key="enter">Enter</div>
       </div>
       <div class="key-row">
-        <div class="key" data-key="shift">Shift</div>
-        <div class="key" data-key="z">z</div><div class="key" data-key="x">x</div>
-        <div class="key" data-key="c">c</div><div class="key" data-key="v">v</div>
-        <div class="key" data-key="b">b</div><div class="key" data-key="n">n</div>
-        <div class="key" data-key="m">m</div><div class="key" data-key=",">,</div>
-        <div class="key" data-key=".">.</div><div class="key" data-key="/">/</div>
-        <div class="key" data-key="shift-r">Shift</div>
+        <div class="key widest" data-key="shift">Shift</div>
+        <div class="key" data-key="z">z</div>
+        <div class="key" data-key="x">x</div>
+        <div class="key" data-key="c">c</div>
+        <div class="key" data-key="v">v</div>
+        <div class="key" data-key="b">b</div>
+        <div class="key" data-key="n">n</div>
+        <div class="key" data-key="m">m</div>
+        <div class="key" data-key=",">,</div>
+        <div class="key" data-key=".">.</div>
+        <div class="key" data-key="/">/</div>
+        <div class="key widest" data-key="shift-r">Shift</div>
       </div>
       <div class="key-row">
-        <div class="key" data-key="ctrl">Ctrl</div>
-        <div class="key" data-key="alt">Alt</div>
+        <div class="key wider" data-key="ctrl">Ctrl</div>
+        <div class="key wide" data-key="alt">Alt</div>
         <div class="key space" data-key=" ">space</div>
-        <div class="key" data-key="alt-r">Alt</div>
-        <div class="key" data-key="ctrl-r">Ctrl</div>
+        <div class="key wide" data-key="alt-r">Alt</div>
+        <div class="key wider" data-key="ctrl-r">Ctrl</div>
       </div>
     </div>
   </div>
 </main>
 
-<div class="sound-selector">
+<div class="sound-selector" id="soundSelector">
   <button class="sound-btn" id="soundBtn">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
     <span id="soundName">Blue Switch</span>
   </button>
 </div>
 
 <div class="rank-badge" id="rankBadge">
   <div class="rank-title">Daraja</div>
-  <div class="rank-name" id="rankName">Boshlangich</div>
-  <div class="rank-stars" id="rankStars"></div>
+  <div class="rank-name" id="rankName">Boshlang'ich</div>
+  <div class="rank-stars" id="rankStars">&#9733;</div>
   <div class="rank-next" id="rankNext">Keyingi: 20 WPM</div>
 </div>
 
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- Settings Overlay -->
-<div class="overlay" id="settingsOverlay">
+<div class="overlay" id="settingsOverlay" role="dialog" aria-modal="true" aria-label="Sozlamalar">
   <div class="overlay-panel">
     <div class="overlay-header">
       <div class="overlay-title">Sozlamalar</div>
-      <button class="overlay-close" id="settingsClose">×</button>
+      <button class="overlay-close" id="settingsClose" aria-label="Yopish">&#x2715;</button>
     </div>
     <div class="settings-section">
       <div class="settings-label">Til</div>
       <div class="settings-grid" id="langOptions">
         <button class="settings-btn active" data-lang="en">English</button>
-        <button class="settings-btn" data-lang="uz">Ozbek</button>
+        <button class="settings-btn" data-lang="uz">O'zbek</button>
         <button class="settings-btn" data-lang="ru">Rus</button>
       </div>
     </div>
     <div class="settings-section">
       <div class="settings-label">Mavzu</div>
       <div class="theme-grid" id="themeGrid">
-        <div class="theme-swatch active" data-theme="default"></div>
-        <div class="theme-swatch" data-theme="ocean"></div>
-        <div class="theme-swatch" data-theme="forest"></div>
-        <div class="theme-swatch" data-theme="sakura"></div>
-        <div class="theme-swatch" data-theme="mono"></div>
-        <div class="theme-swatch" data-theme="blood"></div>
-        <div class="theme-swatch" data-theme="coffee"></div>
-        <div class="theme-swatch" data-theme="nord"></div>
+        <div class="theme-swatch active" data-theme="default" title="Default"></div>
+        <div class="theme-swatch" data-theme="ocean" title="Ocean"></div>
+        <div class="theme-swatch" data-theme="forest" title="Forest"></div>
+        <div class="theme-swatch" data-theme="sakura" title="Sakura"></div>
+        <div class="theme-swatch" data-theme="mono" title="Mono"></div>
+        <div class="theme-swatch" data-theme="blood" title="Blood"></div>
+        <div class="theme-swatch" data-theme="coffee" title="Coffee"></div>
+        <div class="theme-swatch" data-theme="nord" title="Nord"></div>
       </div>
     </div>
     <div class="settings-section">
-      <div class="settings-label">Shrift olchami</div>
+      <div class="settings-label">Shrift o'lchami</div>
       <div class="settings-grid" id="fontSizeOptions">
         <button class="settings-btn" data-fs="1.3rem" data-fh="1.7rem">Kichik</button>
-        <button class="settings-btn active" data-fs="1.65rem" data-fh="2.2rem">Orta</button>
+        <button class="settings-btn active" data-fs="1.65rem" data-fh="2.2rem">O'rta</button>
         <button class="settings-btn" data-fs="2rem" data-fh="2.6rem">Katta</button>
         <button class="settings-btn" data-fs="2.35rem" data-fh="3rem">Juda katta</button>
       </div>
@@ -212,58 +239,79 @@
 </div>
 
 <!-- Result Overlay -->
-<div class="overlay" id="resultOverlay">
+<div class="overlay" id="resultOverlay" role="dialog" aria-modal="true" aria-label="Natija">
   <div class="result-modal">
     <div class="result-wpm">
       <div class="result-wpm-value" id="resultWpm">0</div>
-      <div class="result-wpm-label">soz / daqiqa</div>
+      <div class="result-wpm-label">so'z / daqiqa</div>
     </div>
     <div class="result-stats-grid" id="resultStats"></div>
     <div class="result-actions">
-      <button class="result-btn" id="shareResultBtn">Ulashish</button>
-      <button class="result-btn" id="newWordsBtn">Yangi sozlar</button>
+      <button class="result-btn" id="shareResultBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        Ulashish
+      </button>
+      <button class="result-btn" id="newWordsBtn">Yangi so'zlar</button>
       <button class="result-btn primary" id="restartResultBtn">Qayta</button>
     </div>
   </div>
 </div>
 
+<!-- Share Preview Overlay -->
+<div class="overlay" id="shareOverlay" role="dialog" aria-modal="true" aria-label="Natijani ulashish">
+  <div class="share-preview-card" id="sharePreviewCard">
+    <div class="share-preview-close" id="sharePreviewClose">&#x2715;</div>
+    <div class="share-preview-inner" id="sharePreviewInner">
+      <!-- Card ichi dinamik to'ldiriladi -->
+    </div>
+    <div class="share-preview-actions">
+      <button class="share-preview-btn cancel" id="shareCancelBtn">Bekor qilish</button>
+      <button class="share-preview-btn save" id="shareSaveBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Saqlash
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Leaderboard Overlay -->
-<div class="overlay" id="leaderboardOverlay">
+<div class="overlay" id="leaderboardOverlay" role="dialog" aria-modal="true" aria-label="Top natijalar">
   <div class="overlay-panel">
     <div class="overlay-header">
       <div class="overlay-title">Global Top</div>
-      <button class="overlay-close" id="leaderboardClose">×</button>
+      <button class="overlay-close" id="leaderboardClose" aria-label="Yopish">&#x2715;</button>
     </div>
     <div id="leaderboardList"></div>
   </div>
 </div>
 
-<!-- Statistics Overlay - TO'G'RI ID bilan -->
-<div class="overlay" id="statsOverlay">
+<!-- Statistics Overlay -->
+<div class="overlay" id="statsOverlay" role="dialog" aria-modal="true" aria-label="Statistika">
   <div class="stats-overlay-panel">
     <div class="stats-overlay-header">
       <div class="stats-overlay-title">Statistika</div>
-      <button class="stats-overlay-close" id="statsCloseBtn">×</button>
+      <button class="overlay-close" id="statsCloseBtn" aria-label="Yopish">&#x2715;</button>
     </div>
     <div class="stats-overlay-content" id="statsContent"></div>
   </div>
 </div>
 
 <!-- Duel Overlay -->
-<div class="overlay" id="duelOverlay">
+<div class="overlay" id="duelOverlay" role="dialog" aria-modal="true" aria-label="Duel mode">
   <div class="overlay-panel">
     <div class="overlay-header">
       <div class="overlay-title">Duel Mode</div>
-      <button class="overlay-close" id="duelClose">×</button>
+      <button class="overlay-close" id="duelClose" aria-label="Yopish">&#x2715;</button>
     </div>
-    <div id="duelContent"></div>
+    <div id="duelContent">
+      <p style="color:var(--text-dim);text-align:center;padding:2rem;">⚔️ Duel mode ishlab chiqilmoqda...</p>
+    </div>
   </div>
 </div>
 
 <canvas class="share-canvas" id="shareCanvas" width="800" height="600"></canvas>
 
 <script src="words.js"></script>
-<script src="statistic.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
