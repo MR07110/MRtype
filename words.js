@@ -198,12 +198,9 @@ const SOUNDS = {
 };
 
 const RANKS = [
-  { name: "Boshlang'ich", min: 0,   stars: 1, next: 20,  filled: 1, empty: 4 },
-  { name: "O'rganuvchi",  min: 20,  stars: 2, next: 40,  filled: 2, empty: 3 },
-  { name: "O'rtacha",     min: 40,  stars: 2, next: 60,  filled: 2, empty: 3 },
-  { name: "Mohir",        min: 60,  stars: 3, next: 80,  filled: 3, empty: 2 },
-  { name: "Ustoz",        min: 80,  stars: 4, next: 100, filled: 4, empty: 1 },
-  { name: "Ekspert",      min: 100, stars: 4, next: 120, filled: 4, empty: 1 },
-  { name: "Master",       min: 120, stars: 5, next: 150, filled: 5, empty: 0 },
-  { name: "Legend",       min: 150, stars: 5, next: null, filled: 5, empty: 0 }
+  { name: "Noob",         min: 0,   stars: 1, next: 40 },
+  { name: "O'rganuvchi",  min: 40,  stars: 2, next: 80 },
+  { name: "Mohir",        min: 80,  stars: 3, next: 120 },
+  { name: "Ustoz",        min: 120, stars: 4, next: 140 },
+  { name: "Legend",       min: 140, stars: 5, next: null }
 ];

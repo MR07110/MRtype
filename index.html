@@ -18,6 +18,7 @@
     mr<span class="logo-accent">type</span>
   </div>
   <nav class="header-nav">
+  
     <button class="nav-btn" id="statsBtn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       Statistika
@@ -313,5 +314,78 @@
 
 <script src="words.js"></script>
 <script src="script.js"></script>
+<script>
+// ============ CUSTOM CONSOLE ============
+(function() {
+  const btn = document.getElementById('consoleBtn');
+  if (!btn) return;
+  
+  btn.onclick = function() {
+    let panel = document.getElementById('customConsole');
+    
+    if (panel) {
+      panel.remove();
+      return;
+    }
+    
+    panel = document.createElement('div');
+    panel.id = 'customConsole';
+    panel.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:300px;background:#1a1a1a;color:#0f0;font-family:JetBrains Mono,monospace;font-size:13px;z-index:9999;overflow-y:auto;padding:15px;border-top:2px solid #e2b714;white-space:pre-wrap;line-height:1.5';
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'position:sticky;top:0;float:right;background:#e2b714;color:#000;border:none;padding:4px 10px;cursor:pointer;border-radius:4px;font-size:12px;font-weight:bold;margin-bottom:10px';
+    closeBtn.onclick = function() { panel.remove(); };
+    panel.appendChild(closeBtn);
+    
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = 'Clear';
+    clearBtn.style.cssText = 'position:sticky;top:0;float:right;background:#333;color:#fff;border:1px solid #555;padding:4px 8px;cursor:pointer;border-radius:4px;font-size:11px;margin-bottom:10px;margin-right:6px';
+    clearBtn.onclick = function() {
+      panel.innerHTML = '';
+      panel.appendChild(clearBtn);
+      panel.appendChild(closeBtn);
+    };
+    panel.appendChild(clearBtn);
+    
+    document.body.appendChild(panel);
+    
+    // Override console
+    var oldLog = console.log;
+    var oldWarn = console.warn;
+    var oldError = console.error;
+    
+    console.log = function() {
+      oldLog.apply(console, arguments);
+      var msg = Array.from(arguments).map(function(a) {
+        return typeof a === 'object' ? JSON.stringify(a) : String(a);
+      }).join(' ');
+      panel.innerHTML += '<div style="color:#0f0;margin-bottom:2px">' + msg + '</div>';
+      panel.scrollTop = panel.scrollHeight;
+    };
+    
+    console.warn = function() {
+      oldWarn.apply(console, arguments);
+      var msg = Array.from(arguments).map(function(a) {
+        return typeof a === 'object' ? JSON.stringify(a) : String(a);
+      }).join(' ');
+      panel.innerHTML += '<div style="color:#fa0;margin-bottom:2px">' + msg + '</div>';
+      panel.scrollTop = panel.scrollHeight;
+    };
+    
+    console.error = function() {
+      oldError.apply(console, arguments);
+      var msg = Array.from(arguments).map(function(a) {
+        return typeof a === 'object' ? JSON.stringify(a) : String(a);
+      }).join(' ');
+      panel.innerHTML += '<div style="color:#f44;margin-bottom:2px">' + msg + '</div>';
+      panel.scrollTop = panel.scrollHeight;
+    };
+    
+    console.log('MR TYPE Console ready');
+    console.log('RANK: ' + (typeof RANKS !== 'undefined' ? 'OK' : 'MISSING'));
+  };
+})();
+</script>
 </body>
 </html>
