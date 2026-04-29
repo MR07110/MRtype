@@ -37,7 +37,7 @@ let settings = {
 };
 
 let userHistory = [];
-let userName = 'Qosimov Muhammadrasul';
+let userName = 'mrtype user';
 
 const dom = {
   wordsContainer: document.getElementById('wordsContainer'),
