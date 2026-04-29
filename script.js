@@ -1,3 +1,4 @@
+// words.js dagi mavjud SOUNDS
 // script.js - MR TYPE with CENTER CARET (Monkeytype style)
 // Words scroll from right to left, caret always centered
 
@@ -65,25 +66,52 @@ let currentWordSpan = null;
 // ============ UTILITIES ============
 function playSound(type) {
   if (!settings.soundEnabled) return;
+  
+  // AudioContextni tayyorlash
   if (!audioCtx) {
-    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
+    try { 
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+    } catch(e) { 
+      console.log('Audio not supported'); 
+      return; 
+    }
   }
-  const sound = SOUNDS[currentSound];
-  if (!sound) return;
-  try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.frequency.value = type === 'correct' ? sound.correct : sound.error;
-    osc.type = sound.type;
-    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + sound.dur);
-    osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + sound.dur);
-  } catch(e) {}
+  
+  // AudioContext "suspended" holatda bo'lsa - resume qilish
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().then(() => {
+      playSoundInternal(type);
+    });
+    return;
+  }
+  
+  playSoundInternal(type);
 }
 
+function playSoundInternal(type) {
+  const sound = SOUNDS[currentSound];
+  if (!sound) return;
+  
+  try {
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.frequency.value = type === 'correct' ? sound.correct : sound.error;
+    osc.type = sound.type;
+    
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + sound.dur);
+    
+    osc.start(now);
+    osc.stop(now + sound.dur);
+  } catch(e) {
+    console.log('Play sound error:', e);
+  }
+}
 function highlightKey(key, status) {
   const el = document.querySelector(`.key[data-key="${key}"]`);
   if (!el) return;

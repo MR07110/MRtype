@@ -190,13 +190,25 @@ const QUOTES = {
 };
 
 const SOUNDS = {
-  "Blue Switch":  { correct: 800,  error: 200, dur: 0.03, type: 'sine' },
-  "Brown Switch": { correct: 600,  error: 180, dur: 0.04, type: 'triangle' },
-  "Red Switch":   { correct: 1000, error: 220, dur: 0.02, type: 'square' },
-  "Creamy":       { correct: 500,  error: 150, dur: 0.05, type: 'sine' },
-  "Thock":        { correct: 300,  error: 120, dur: 0.06, type: 'sawtooth' }
+  // Mavjud ovozlar
+  blue: { correct: 523.25, error: 261.63, type: 'sine', dur: 0.15 },
+  brown: { correct: 440.00, error: 220.00, type: 'triangle', dur: 0.12 },
+  red: { correct: 659.25, error: 329.63, type: 'square', dur: 0.1 },
+  creamy: { correct: 493.88, error: 246.94, type: 'sine', dur: 0.18 },
+  thock: { correct: 392.00, error: 196.00, type: 'sawtooth', dur: 0.2 },
+  
+  // YANGI OVOZLAR
+  cherry: { correct: 783.99, error: 391.99, type: 'sine', dur: 0.08 },
+  silent: { correct: 261.63, error: 130.81, type: 'sine', dur: 0.05 },
+  typewriter: { correct: 880.00, error: 440.00, type: 'triangle', dur: 0.03 },
+  mechanical: { correct: 659.25, error: 329.63, type: 'square', dur: 0.12 },
+  retro: { correct: 523.25, error: 261.63, type: 'sawtooth', dur: 0.2 },
+  bell: { correct: 1046.50, error: 523.25, type: 'sine', dur: 0.25 },
+  click: { correct: 1000.00, error: 500.00, type: 'triangle', dur: 0.02 },
+  deep: { correct: 261.63, error: 130.81, type: 'sawtooth', dur: 0.3 },
+  light: { correct: 1318.52, error: 659.25, type: 'sine', dur: 0.1 },
+  bass: { correct: 196.00, error: 98.00, type: 'sawtooth', dur: 0.35 }
 };
-
 const RANKS = [
   { name: "Noob",         min: 0,   stars: 1, next: 40 },
   { name: "O'rganuvchi",  min: 40,  stars: 2, next: 80 },
